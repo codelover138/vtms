@@ -1,0 +1,4 @@
+Code,Name,Slug,Image,parent category
+C1,Category 1,cat1,,
+sub1,sub1,sub1,,C1
+sub2,sub2,sub2,,C1
