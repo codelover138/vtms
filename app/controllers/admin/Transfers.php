@@ -133,7 +133,6 @@ class Transfers extends MY_Controller
     {
         $this->sma->checkPermissions('index');
         $detail_link = anchor('admin/transfers/details?id=$1', '<i class="fa fa-file-text-o"></i> ' . lang('Transfer_Details'));
-        // $email_link    = anchor('admin/transfers/email/$1', '<i class="fa fa-envelope"></i> ' . lang('email_transfer'), 'data-toggle="modal" data-target="#myModal"');
         $pdf_link      = anchor('admin/transfers/pdf?id=$1', '<i class="fa fa-file-pdf-o"></i> ' . lang('download_pdf'));
         $delete_link   = "<a href='#' class='tip po' title='<b>" . lang('delete_transfer') . "</b>' data-content=\"<p>"
             . lang('r_u_sure') . "</p><a class='btn btn-danger po-delete' id='a__$1' href='" . admin_url('transfers/delete?id=$1') . "'>"
@@ -150,30 +149,18 @@ class Transfers extends MY_Controller
     </div></div>';
 
         $this->load->library('datatables');
-        $this->datatables->select("{$this->db->dbprefix('income_data')}.reference_no,
-            {$this->db->dbprefix('income_data')}.reference_no as ref,
-            MIN({$this->db->dbprefix('income_data')}.created_at) AS created_at,
-            MIN({$this->db->dbprefix('income_data')}.customer_name) AS customer_name,
-            MIN({$this->db->dbprefix('income_data')}.date_transmission) AS start_date,
-            MAX({$this->db->dbprefix('income_data')}.date_transmission) AS end_date,
-            SUM({$this->db->dbprefix('income_data')}.taxable_sales) AS total_taxable_sales,
-            SUM({$this->db->dbprefix('income_data')}.sale_taxes) AS total_sale_taxes,
-            1, {$this->db->dbprefix('income_data')}.id) AS id", FALSE)
+        $table = $this->db->dbprefix('income_data');
+        $this->datatables->select("$table.reference_no,
+            $table.reference_no as ref,
+            MIN($table.created_at) AS created_at,
+            MIN($table.customer_name) AS customer_name,
+            MIN($table.date_transmission) AS start_date,
+            MAX($table.date_transmission) AS end_date,
+            SUM($table.taxable_sales) AS total_taxable_sales,
+            SUM($table.sale_taxes) AS total_sale_taxes,
+            COUNT(*) AS number_of_data", true)
             ->from('income_data')
-            ->group_by("{$this->db->dbprefix('income_data')}.reference_no");
-
-
-             $this->datatables->select("{$this->db->dbprefix('income_data')}.reference_no,
-            {$this->db->dbprefix('income_data')}.reference_no as ref,
-           {$this->db->dbprefix('income_data')}.created_at AS created_at,
-           {$this->db->dbprefix('income_data')}.customer_name) AS customer_name,
-           {$this->db->dbprefix('income_data')}.date_transmission) AS start_date,
-{$this->db->dbprefix('income_data')}.date_transmission) AS end_date,
-            {$this->db->dbprefix('income_data')}.taxable_sales) AS total_taxable_sales,
-            {$this->db->dbprefix('income_data')}.sale_taxes) AS total_sale_taxes,
-            COUNT(*) AS number_of_data, MIN({$this->db->dbprefix('income_data')}.id) AS id", FALSE)
-            ->from('income_data')
-            ->group_by("{$this->db->dbprefix('income_data')}.reference_no");
+            ->group_by("$table.reference_no");
 
         
 
@@ -181,9 +168,7 @@ class Transfers extends MY_Controller
             $this->datatables->where("{$this->db->dbprefix('income_data')}.created_by", $this->session->userdata('user_id'));
         }
 
-        $this->datatables->add_column('Actions', $action, 'reference_no');
-
-
+        $this->datatables->add_column('Actions', $action, 'ref');
         echo $this->datatables->generate();
     }
 
@@ -695,23 +680,24 @@ class Transfers extends MY_Controller
     }
 
 
-    public function details($transfer_id = null)
+    public function details($id = null)
     {
         $this->sma->checkPermissions('index');
         if ($this->input->get('id')) {
-            $transfer_id = $this->input->get('id');
+            $id = $this->input->get('id');
         }
         $this->data['error'] = (validation_errors()) ? validation_errors() : $this->session->flashdata('error');
-        $transfer_list = $this->transfers_model->getTransferByReferenceNo($transfer_id);
-        $transfer            = $this->transfers_model->get_monthly_taxable_sales($transfer_id);
+        $transfer_list = $this->transfers_model->getTransferByReferenceNo($id);
+        $transfer = $this->transfers_model->get_monthly_taxable_sales($id);
         if (!$this->session->userdata('view_right')) {
             $this->sma->view_rights($transfer[0]->created_by, true);
         }
         $this->data['transfer']       = $transfer;
         $this->data['transfer_list']  = $transfer_list;
-        $this->data['tid']            = $transfer_id;
+        $this->data['tid']            = $id;
         $this->data['customer'] = $this->site->getCompanyByID($transfer[0]->customer_id);
         $this->data['created_by']     = $this->site->getUser($transfer[0]->created_by);
+
         $bc = array(array('link' => base_url(), 'page' => lang('home')), array('link' => admin_url('transfers'), 'page' => lang('transfers')), array('link' => '#', 'page' => lang('Details')));
         $meta = array('page_title' => lang('view_sales_details'), 'bc' => $bc);
         $this->page_construct('transfers/details', $meta, $this->data);

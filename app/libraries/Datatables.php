@@ -292,43 +292,83 @@ class Datatables
         else
             $mColArray = $this->columns;
 
+        // Helper function to check if a column expression uses aggregate functions
+        $is_aggregate = function($expression) {
+            return preg_match('/\b(MIN|MAX|SUM|COUNT|AVG)\s*\(/i', $expression);
+        };
+
+        // Check if we have GROUP BY - if so, aggregate columns need HAVING instead of WHERE
+        $has_group_by = !empty($this->group_by);
+
         $sWhere = '';
+        $sHaving = '';
         $sSearch = $this->ci->db->escape_like_str($this->ci->input->post('sSearch'));
         $mColArray = array_values(array_diff($mColArray, $this->unset_columns));
         $columns = array_values(array_diff($this->columns, $this->unset_columns));
 
-        if ($sSearch != '')
-            for ($i = 0; $i < count($mColArray); $i++)
-                if ($this->ci->input->post('bSearchable_' . $i) == 'true' && in_array($mColArray[$i], $columns))
-                    $sWhere .= $this->select[$mColArray[$i]] . " LIKE '%" . $sSearch . "%' OR ";
+        if ($sSearch != '') {
+            for ($i = 0; $i < count($mColArray); $i++) {
+                if ($this->ci->input->post('bSearchable_' . $i) == 'true' && in_array($mColArray[$i], $columns)) {
+                    $expression = $this->select[$mColArray[$i]];
+                    $searchClause = $expression . " LIKE '%" . $sSearch . "%' OR ";
+                    
+                    // Use HAVING for aggregate functions when GROUP BY is present, otherwise WHERE
+                    if ($has_group_by && $is_aggregate($expression)) {
+                        $sHaving .= $searchClause;
+                    } else {
+                        $sWhere .= $searchClause;
+                    }
+                }
+            }
+        }
 
         $sWhere = substr_replace($sWhere, '', -3);
+        $sHaving = substr_replace($sHaving, '', -3);
 
         if ($sWhere != '')
             $this->ci->db->where('(' . $sWhere . ')');
+            
+        if ($sHaving != '')
+            $this->ci->db->having('(' . $sHaving . ')');
 
         $sRangeSeparator = $this->ci->input->post('sRangeSeparator');
 
         for ($i = 0; $i < intval($this->ci->input->post('iColumns')); $i++) {
             if (isset($_POST['sSearch_' . $i]) && $this->ci->input->post('sSearch_' . $i) != '' && in_array($mColArray[$i], $columns)) {
                 $miSearch = explode(',', $this->ci->input->post('sSearch_' . $i));
+                $expression = $this->select[$mColArray[$i]];
+                $use_having = $has_group_by && $is_aggregate($expression);
 
                 foreach ($miSearch as $val) {
-                    if (preg_match("/(<=|>=|=|<|>)(\s*)(.+)/i", trim($val), $matches))
-                        $this->ci->db->where($this->select[$mColArray[$i]] . ' ' . $matches[1], $matches[3]);
-                    elseif (!empty($sRangeSeparator) && preg_match("/(.*)$sRangeSeparator(.*)/i", trim($val), $matches)) {
+                    if (preg_match("/(<=|>=|=|<|>)(\s*)(.+)/i", trim($val), $matches)) {
+                        if ($use_having) {
+                            $this->ci->db->having($expression . ' ' . $matches[1], $matches[3]);
+                        } else {
+                            $this->ci->db->where($expression . ' ' . $matches[1], $matches[3]);
+                        }
+                    } elseif (!empty($sRangeSeparator) && preg_match("/(.*)$sRangeSeparator(.*)/i", trim($val), $matches)) {
                         $rangeQuery = '';
 
                         if (!empty($matches[1]))
-                            $rangeQuery = 'STR_TO_DATE(' . $this->select[$mColArray[$i]] . ",'%d/%m/%y %H:%i:%s') >= STR_TO_DATE('" . $matches[1] . " 00:00:00','%d/%m/%y %H:%i:%s')";
+                            $rangeQuery = 'STR_TO_DATE(' . $expression . ",'%d/%m/%y %H:%i:%s') >= STR_TO_DATE('" . $matches[1] . " 00:00:00','%d/%m/%y %H:%i:%s')";
 
                         if (!empty($matches[2]))
-                            $rangeQuery .= (!empty($rangeQuery) ? ' AND ' : '') . 'STR_TO_DATE(' . $this->select[$mColArray[$i]] . ",'%d/%m/%y %H:%i:%s') <= STR_TO_DATE('" . $matches[2] . " 23:59:59','%d/%m/%y %H:%i:%s')";
+                            $rangeQuery .= (!empty($rangeQuery) ? ' AND ' : '') . 'STR_TO_DATE(' . $expression . ",'%d/%m/%y %H:%i:%s') <= STR_TO_DATE('" . $matches[2] . " 23:59:59','%d/%m/%y %H:%i:%s')";
 
-                        if (!empty($matches[1]) || !empty($matches[2]))
-                            $this->ci->db->where($rangeQuery);
-                    } else
-                        $this->ci->db->where($this->select[$mColArray[$i]] . ' LIKE', '%' . $val . '%');
+                        if (!empty($matches[1]) || !empty($matches[2])) {
+                            if ($use_having) {
+                                $this->ci->db->having($rangeQuery);
+                            } else {
+                                $this->ci->db->where($rangeQuery);
+                            }
+                        }
+                    } else {
+                        if ($use_having) {
+                            $this->ci->db->having($expression . ' LIKE', '%' . $val . '%');
+                        } else {
+                            $this->ci->db->where($expression . ' LIKE', '%' . $val . '%');
+                        }
+                    }
                 }
             }
         }
@@ -412,6 +452,9 @@ class Datatables
      */
     private function get_total_results($filtering = FALSE)
     {
+        // Reset query builder to ensure clean state (FROM might be set from previous queries)
+        $this->ci->db->reset_query();
+        
         if ($filtering)
             $this->get_filtering();
 
@@ -433,6 +476,23 @@ class Datatables
         if (strlen($this->distinct) > 0) {
             $this->ci->db->distinct($this->distinct);
             $this->ci->db->select($this->columns);
+        }
+
+        // Use count_all_results() when there's a GROUP BY to properly handle ONLY_FULL_GROUP_BY
+        // count_all_results() wraps the query in a subquery: SELECT COUNT(*) FROM (SELECT ... GROUP BY ...)
+        // This avoids the ONLY_FULL_GROUP_BY error because the outer query just counts rows
+        if (!empty($this->group_by)) {
+            // For counting with GROUP BY, we only need to SELECT the GROUP BY column(s)
+            // This is sufficient and avoids ONLY_FULL_GROUP_BY errors
+            $select_cols = array();
+            foreach ($this->group_by as $col) {
+                $select_cols[] = trim($col);
+            }
+            // Remove duplicates in case GROUP BY has same column multiple times
+            $select_cols = array_unique($select_cols);
+            $this->ci->db->select(implode(', ', $select_cols), FALSE);
+            // Pass the table - count_all_results will set FROM, and it handles GROUP BY properly
+            return $this->ci->db->count_all_results($this->table, FALSE);
         }
 
         $query = $this->ci->db->get($this->table, NULL, NULL, FALSE);

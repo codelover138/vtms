@@ -33,9 +33,9 @@ $(document).ready(function() {
         }, null, {
             "mRender": fld
         }, null, {
-            "mRender": fld
+            "mRender": fsd
         }, {
-            "mRender": fld
+            "mRender": fsd
         }, {
             "mRender": currencyFormat
         }, {

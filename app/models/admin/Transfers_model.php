@@ -287,9 +287,6 @@ class Transfers_model extends CI_Model
 
     public function deleteTransfer($id)
     {
-        // $ostatus = $this->resetTransferActions($id, 1);
-        // $oitems = $this->getAllTransferItems($id, $ostatus);
-        // $tbl = $ostatus == 'completed' ? 'purchase_items' : 'transfer_items';
         if ($this->db->delete('income_data', array('reference_no' => $id))) {
             return true;
         }
@@ -298,17 +295,21 @@ class Transfers_model extends CI_Model
 
 
 public function get_monthly_taxable_sales($reference_number) {
-    $this->db->select("DATE_FORMAT(date_transmission, '%Y-%m') AS month, customer_name,customer_id,
-        SUM(taxable_sales) AS total_taxable_sales, created_by,created_at, reference_no,
+    $this->db->select("DATE_FORMAT(date_transmission, '%Y-%m') AS month, 
+        MIN(customer_name) AS customer_name,
+        MIN(customer_id) AS customer_id,
+        SUM(taxable_sales) AS total_taxable_sales, 
+        MIN(created_by) AS created_by,
+        MIN(created_at) AS created_at, 
+        MIN(reference_no) AS reference_no,
         SUM(sale_taxes) AS total_sale_taxes");
-    $this->db->from('income_data'); // Replace with your table name
+    $this->db->from('income_data');
     $this->db->where('reference_no', $reference_number);
     $this->db->group_by("DATE_FORMAT(date_transmission, '%Y-%m')");
-    // $this->db->order_by("DATE_FORMAT(date_transmission, '%Y-%m')", 'ASC');
+    $this->db->order_by("DATE_FORMAT(date_transmission, '%Y-%m')", 'ASC', FALSE);
     
     $query = $this->db->get();
     return $query->result();
-
 }
     public function getProductOptions($product_id, $warehouse_id, $zero_check = TRUE)
     {
@@ -436,6 +437,7 @@ public function get_monthly_taxable_sales($reference_number) {
 
     public function getTransferByReferenceNo($id)
     {
+
         $q = $this->db->get_where('income_data', array('reference_no' => $id));
         if ($q->num_rows() > 0) {
             foreach (($q->result()) as $row) {
@@ -443,6 +445,7 @@ public function get_monthly_taxable_sales($reference_number) {
             }
             return $data;
         }
+
         return FALSE;
     }
 
