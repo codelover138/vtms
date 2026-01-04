@@ -45,3 +45,4 @@ INSERT INTO `sma_inps_rate_slabs` (`slab_year`, `customer_type`, `income_from`, 
 -- (2025, NULL, 50001.00, 100000.00, 25.00, NULL, 'INPS rate for income range 50001-100000 (2025, all types)', 1),
 -- (2025, NULL, 100001.00, NULL, 25.50, NULL, 'INPS rate for income above 100000 (2025, all types)', 1);
 
+

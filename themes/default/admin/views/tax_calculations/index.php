@@ -1,4 +1,48 @@
 <?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
+<style>
+.dropdown-menu .input-group {
+    margin: 0;
+}
+.dropdown-menu .input-group .form-control {
+    border-radius: 4px 0 0 4px;
+    border-right: 0;
+}
+.dropdown-menu .input-group .input-group-btn .btn {
+    border-radius: 0 4px 4px 0;
+    border-left: 0;
+}
+.dropdown-menu li.dropdown-header {
+    padding: 5px 15px;
+    font-weight: 600;
+    color: #333;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+.dropdown-menu > li > a {
+    padding: 8px 15px;
+}
+.dropdown-menu > li > a.tip {
+    display: block;
+    clear: both;
+    font-weight: normal;
+    line-height: 1.42857143;
+    color: #333;
+    white-space: nowrap;
+}
+.dropdown-menu > li > a.tip:hover,
+.dropdown-menu > li > a.tip:focus {
+    text-decoration: none;
+    color: #262626;
+    background-color: #f5f5f5;
+}
+.dropdown-menu .input-group,
+.dropdown-menu .input-group * {
+    cursor: pointer;
+}
+.dropdown-menu .input-group input {
+    cursor: text;
+}
+</style>
 <script>
 $(document).ready(function() {
     var tTable = $('#TaxData').dataTable({
@@ -67,12 +111,22 @@ $(document).ready(function() {
         }
     ], "footer");
 
+    // Prevent dropdown from closing when clicking on year input or input group
+    $(document).on('click', '.dropdown-menu .input-group, .dropdown-menu .input-group *', function(e) {
+        e.stopPropagation();
+    });
+    
     // Handle calculate button click
     $(document).on('click', '.calculate-tax-btn', function(e) {
         e.preventDefault();
+        e.stopPropagation();
         var customer_id = $(this).data('customer-id');
-        var year_input = $(this).siblings('.year-input');
+        // Find the year input in the same dropdown menu
+        var year_input = $(this).closest('.dropdown-menu').find('.year-input');
         var year = year_input.val() || new Date().getFullYear();
+        
+        // Close the dropdown
+        $(this).closest('.btn-group').removeClass('open');
         
         bootbox.confirm("<?= lang('calculate_tax_for_year') ?> " + year + "?", function(result) {
             if (result) {
@@ -137,7 +191,7 @@ $(document).ready(function() {
                                 <th><?= lang("tax_regime"); ?></th>
                                 <th><?= lang("email"); ?></th>
                                 <th><?= lang("phone"); ?></th>
-                                <th style="min-width:200px;"><?= lang("actions"); ?></th>
+                                <th style="min-width:100px; width:100px;"><?= lang("actions"); ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -156,7 +210,7 @@ $(document).ready(function() {
                                 <th></th>
                                 <th></th>
                                 <th></th>
-                                <th style="min-width:200px; text-align: center;"><?= lang("actions"); ?></th>
+                                <th style="min-width:100px; width:100px; text-align: center;"><?= lang("actions"); ?></th>
                             </tr>
                         </tfoot>
                     </table>

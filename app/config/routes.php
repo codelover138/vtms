@@ -31,6 +31,7 @@ $route['shop/(:any)/(:any)/(:any)'] = 'shop/shop/$1/$2/$3';
 $route['login'] = 'main/login';
 $route['logout'] = 'main/logout';
 $route['profile'] = 'main/profile';
+$route['dashboard'] = 'main/dashboard';
 $route['register'] = 'main/register';
 $route['login/(:any)'] = 'main/login/$1';
 $route['logout/(:any)'] = 'main/logout/$1';

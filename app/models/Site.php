@@ -105,10 +105,11 @@ class Site extends CI_Model
         if (!$id) {
             $id = $this->session->userdata('user_id');
         }
-        if($id) 
-        $q = $this->db->get_where('users', array('id' => $id), 1);
-        if ($q->num_rows() > 0) {
-            return $q->row();
+        if ($id) {
+            $q = $this->db->get_where('users', array('id' => $id), 1);
+            if ($q && $q->num_rows() > 0) {
+                return $q->row();
+            }
         }
         return FALSE;
     }

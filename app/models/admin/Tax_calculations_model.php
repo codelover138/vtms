@@ -46,6 +46,91 @@ class Tax_calculations_model extends CI_Model
     }
 
     /**
+     * Get sales data grouped by month for a customer and year
+     */
+    public function getSalesByMonth($customer_id, $year)
+    {
+        $this->db->select('MONTH(date_transmission) as month, SUM(taxable_sales) as monthly_sales, COUNT(*) as entry_count');
+        $this->db->where('customer_id', $customer_id);
+        $this->db->where('YEAR(date_transmission)', $year);
+        $this->db->group_by('MONTH(date_transmission)');
+        $this->db->order_by('month', 'ASC');
+        $q = $this->db->get('income_data');
+        
+        if ($q->num_rows() > 0) {
+            return $q->result();
+        }
+        return array();
+    }
+
+    /**
+     * Predict taxable income based on existing sales data
+     * This calculates what the taxable income would be if all months had sales data
+     */
+    public function predictTaxableIncome($customer_id, $year)
+    {
+        $customer = $this->getCustomerTaxSettings($customer_id);
+        if (!$customer) {
+            return FALSE;
+        }
+
+        // Get sales data by month
+        $monthly_sales = $this->getSalesByMonth($customer_id, $year);
+        
+        // Get current total sales
+        $current_total_sales = $this->getTotalSalesForYear($customer_id, $year);
+        
+        // Identify which months have data
+        $months_with_data = array();
+        $total_months_with_data = 0;
+        $total_sales_from_data = 0;
+        
+        foreach ($monthly_sales as $month_data) {
+            $months_with_data[] = (int)$month_data->month;
+            $total_months_with_data++;
+            $total_sales_from_data += $month_data->monthly_sales;
+        }
+        
+        // Calculate missing months
+        $all_months = range(1, 12);
+        $missing_months = array_diff($all_months, $months_with_data);
+        $missing_months_count = count($missing_months);
+        
+        // If no months have data, return false
+        if ($total_months_with_data == 0) {
+            return FALSE;
+        }
+        
+        // Calculate average monthly sales from existing data
+        $average_monthly_sales = $total_sales_from_data / $total_months_with_data;
+        
+        // Predict total sales if all months were filled
+        $predicted_additional_sales = $average_monthly_sales * $missing_months_count;
+        $predicted_total_sales = $current_total_sales + $predicted_additional_sales;
+        
+        // Get coefficient
+        $coefficient = $customer->coefficient_of_profitability ? $customer->coefficient_of_profitability : 78.00;
+        
+        // Calculate predicted taxable income
+        $predicted_taxable_income = $predicted_total_sales * $coefficient / 100;
+        
+        return array(
+            'current_total_sales' => $current_total_sales,
+            'current_taxable_income' => $current_total_sales * $coefficient / 100,
+            'months_with_data' => $months_with_data,
+            'missing_months' => array_values($missing_months),
+            'missing_months_count' => $missing_months_count,
+            'total_months_with_data' => $total_months_with_data,
+            'average_monthly_sales' => $average_monthly_sales,
+            'predicted_additional_sales' => $predicted_additional_sales,
+            'predicted_total_sales' => $predicted_total_sales,
+            'predicted_taxable_income' => $predicted_taxable_income,
+            'coefficient' => $coefficient,
+            'monthly_sales_data' => $monthly_sales
+        );
+    }
+
+    /**
      * Get previous year INPS amount paid
      */
     public function getPreviousYearINPS($customer_id, $year)

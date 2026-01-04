@@ -9,17 +9,255 @@ class Main extends MY_Shop_Controller
         if ($this->Settings->mmode && $this->v != 'login') { redirect('notify/offline'); }
         $this->load->library('ion_auth');
         $this->load->library('form_validation');
-        $this->lang->admin_load('auth', $this->Settings->user_language);
+        $user_language = isset($this->Settings->user_language) ? $this->Settings->user_language : (isset($this->Settings->language) ? $this->Settings->language : 'english');
+        $this->lang->admin_load('auth', $user_language);
     }
 
     function index() {
         if (!SHOP) { redirect('admin'); }
         if ($this->shop_settings->private && !$this->loggedIn) { redirect('/login'); }
+        // Redirect customer users to dashboard
+        if ($this->loggedIn && $this->Customer) {
+            redirect('dashboard');
+        }
         $this->data['featured_products'] = $this->shop_model->getFeaturedProducts();
         $this->data['slider'] = json_decode($this->shop_settings->slider);
         $this->data['page_title'] = $this->shop_settings->shop_name;
         $this->data['page_desc'] = $this->shop_settings->description;
         $this->page_construct('index', $this->data);
+    }
+
+    function dashboard() {
+        if (!$this->loggedIn) { 
+            $this->session->set_userdata('requested_page', 'dashboard');
+            redirect('/login'); 
+        }
+        if ($this->Staff) { redirect('admin/welcome'); }
+        if (!$this->Customer) { redirect('/'); }
+
+        // Load tax calculations model and language
+        $this->load->admin_model('tax_calculations_model');
+        $user_language = isset($this->Settings->user_language) ? $this->Settings->user_language : (isset($this->Settings->language) ? $this->Settings->language : 'english');
+        $this->lang->admin_load('sma', $user_language);
+        $this->lang->admin_load('tax_calculations', $user_language);
+        
+        // If SHOP is not enabled, we need to set up basic shop settings
+        if (!SHOP) {
+            // Create a minimal shop_settings object
+            $this->shop_settings = (object)array(
+                'shop_name' => $this->Settings->site_name,
+                'description' => '',
+                'private' => 0
+            );
+            $this->data['shop_settings'] = $this->shop_settings;
+        }
+        
+        // Ensure loggedInUser is in data array
+        if (!isset($this->data['loggedInUser']) && isset($this->loggedInUser)) {
+            $this->data['loggedInUser'] = $this->loggedInUser;
+        }
+        
+        // Get customer ID from user's company_id
+        $user = $this->site->getUser();
+        $customer_id = $user->company_id;
+        
+        if (!$customer_id) {
+            $this->session->set_flashdata('error', lang('customer_not_found'));
+            redirect('/');
+        }
+
+        // Get current year
+        $current_year = date('Y');
+        
+        // Get all tax calculations for this customer
+        $this->data['tax_calculations'] = $this->tax_calculations_model->getAllTaxCalculations($customer_id);
+        
+        // Get tax year from request or use latest
+        $requested_year = $this->input->get('year');
+        $latest_calculation = !empty($this->data['tax_calculations']) ? $this->data['tax_calculations'][0] : null;
+        $tax_year = $requested_year ? $requested_year : ($latest_calculation ? $latest_calculation->tax_year : $current_year);
+        $this->data['tax_year'] = $tax_year;
+        
+        // Get tax calculation for selected year
+        $this->data['tax_calculation'] = $this->tax_calculations_model->getTaxCalculation($customer_id, $tax_year);
+        $this->data['latest_tax_calculation'] = $this->data['tax_calculation'] ? $this->data['tax_calculation'] : $latest_calculation;
+        
+        // Get all tax payments for the selected year
+        $this->data['tax_payments'] = $this->tax_calculations_model->getAllTaxPayments($customer_id, $tax_year);
+        
+        // Get INPS calculation and payments
+        $inps_calc_query = $this->db->get_where('inps_calculations', array('customer_id' => $customer_id, 'tax_year' => $tax_year), 1);
+        $this->data['inps_calculation'] = $inps_calc_query->num_rows() > 0 ? $inps_calc_query->row() : FALSE;
+        $this->data['inps_payments'] = $this->tax_calculations_model->getAllINPSPayments($customer_id, $tax_year);
+        
+        // Get INAIL calculation and payments (only for Artigiani)
+        $this->data['inail_calculation'] = $this->tax_calculations_model->getINAILCalculation($customer_id, $tax_year);
+        $this->data['inail_payments'] = $this->tax_calculations_model->getAllINAILPayments($customer_id, $tax_year);
+        
+        // Get Diritto Annuale payments (for Artigiani and Commercianti)
+        $this->data['diritto_annuale_payments'] = $this->tax_calculations_model->getAllDirittoAnnualePayments($customer_id, $tax_year);
+        
+        // Get Fattura Tra Privati calculation and payments
+        $this->data['fattura_tra_privati_calculation'] = $this->tax_calculations_model->getFatturaTraPrivatiCalculation($customer_id, $tax_year);
+        $this->data['fattura_tra_privati_payments'] = $this->tax_calculations_model->getAllFatturaTraPrivatiPayments($customer_id, $tax_year);
+        
+        // Get prediction data for taxable income
+        $this->data['income_prediction'] = $this->tax_calculations_model->predictTaxableIncome($customer_id, $tax_year);
+        
+        // Get upcoming payments (due date >= today)
+        $upcoming_payments = array();
+        $overdue_payments = array();
+        $paid_payments = array();
+        $today = date('Y-m-d');
+        
+        // Initialize payment arrays if they don't exist
+        if (!is_array($this->data['tax_payments'])) $this->data['tax_payments'] = array();
+        if (!is_array($this->data['inps_payments'])) $this->data['inps_payments'] = array();
+        if (!is_array($this->data['inail_payments'])) $this->data['inail_payments'] = array();
+        if (!is_array($this->data['diritto_annuale_payments'])) $this->data['diritto_annuale_payments'] = array();
+        if (!is_array($this->data['fattura_tra_privati_payments'])) $this->data['fattura_tra_privati_payments'] = array();
+        
+        foreach ($this->data['tax_payments'] as $payment) {
+            if ($payment->status == 'paid') {
+                $paid_payments[] = $payment;
+            } elseif (strtotime($payment->due_date) < strtotime($today)) {
+                $overdue_payments[] = $payment;
+            } else {
+                $upcoming_payments[] = $payment;
+            }
+        }
+        
+        foreach ($this->data['inps_payments'] as $payment) {
+            if ($payment->status == 'paid') {
+                $paid_payments[] = $payment;
+            } elseif (strtotime($payment->due_date) < strtotime($today)) {
+                $overdue_payments[] = $payment;
+            } else {
+                $upcoming_payments[] = $payment;
+            }
+        }
+        
+        $this->data['upcoming_payments'] = $upcoming_payments;
+        $this->data['overdue_payments'] = $overdue_payments;
+        $this->data['paid_payments'] = $paid_payments;
+        
+        // Calculate summary statistics
+        $total_due = 0;
+        $total_paid = 0;
+        $total_overdue = 0;
+        $total_upcoming = 0;
+        
+        foreach ($this->data['tax_payments'] as $payment) {
+            if ($payment->status == 'paid') {
+                $total_paid += $payment->paid_amount;
+            } else {
+                $total_due += $payment->amount;
+                if (strtotime($payment->due_date) < strtotime($today)) {
+                    $total_overdue += $payment->amount;
+                } else {
+                    $total_upcoming += $payment->amount;
+                }
+            }
+        }
+        
+        foreach ($this->data['inps_payments'] as $payment) {
+            if ($payment->status == 'paid') {
+                $total_paid += $payment->paid_amount ? $payment->paid_amount : 0;
+            } else {
+                $total_due += $payment->amount;
+                if (strtotime($payment->due_date) < strtotime($today)) {
+                    $total_overdue += $payment->amount;
+                } else {
+                    $total_upcoming += $payment->amount;
+                }
+            }
+        }
+        
+        // Include INAIL payments
+        foreach ($this->data['inail_payments'] as $payment) {
+            if ($payment->status == 'paid') {
+                $total_paid += $payment->paid_amount ? $payment->paid_amount : 0;
+            } else {
+                $total_due += $payment->amount;
+                if (strtotime($payment->due_date) < strtotime($today)) {
+                    $total_overdue += $payment->amount;
+                } else {
+                    $total_upcoming += $payment->amount;
+                }
+            }
+        }
+        
+        // Include Diritto Annuale payments
+        foreach ($this->data['diritto_annuale_payments'] as $payment) {
+            if ($payment->status == 'paid') {
+                $total_paid += $payment->paid_amount ? $payment->paid_amount : 0;
+            } else {
+                $total_due += $payment->amount;
+                if (strtotime($payment->due_date) < strtotime($today)) {
+                    $total_overdue += $payment->amount;
+                } else {
+                    $total_upcoming += $payment->amount;
+                }
+            }
+        }
+        
+        // Include Fattura Tra Privati payments
+        foreach ($this->data['fattura_tra_privati_payments'] as $payment) {
+            if ($payment->status == 'paid') {
+                $total_paid += $payment->paid_amount ? $payment->paid_amount : 0;
+            } else {
+                $total_due += $payment->amount;
+                if (strtotime($payment->due_date) < strtotime($today)) {
+                    $total_overdue += $payment->amount;
+                } else {
+                    $total_upcoming += $payment->amount;
+                }
+            }
+        }
+        
+        // Add all payment types to payment arrays
+        foreach ($this->data['inail_payments'] as $payment) {
+            if ($payment->status == 'paid') {
+                $paid_payments[] = $payment;
+            } elseif (strtotime($payment->due_date) < strtotime($today)) {
+                $overdue_payments[] = $payment;
+            } else {
+                $upcoming_payments[] = $payment;
+            }
+        }
+        
+        foreach ($this->data['diritto_annuale_payments'] as $payment) {
+            if ($payment->status == 'paid') {
+                $paid_payments[] = $payment;
+            } elseif (strtotime($payment->due_date) < strtotime($today)) {
+                $overdue_payments[] = $payment;
+            } else {
+                $upcoming_payments[] = $payment;
+            }
+        }
+        
+        foreach ($this->data['fattura_tra_privati_payments'] as $payment) {
+            if ($payment->status == 'paid') {
+                $paid_payments[] = $payment;
+            } elseif (strtotime($payment->due_date) < strtotime($today)) {
+                $overdue_payments[] = $payment;
+            } else {
+                $upcoming_payments[] = $payment;
+            }
+        }
+        
+        $this->data['total_due'] = $total_due;
+        $this->data['total_paid'] = $total_paid;
+        $this->data['total_overdue'] = $total_overdue;
+        $this->data['total_upcoming'] = $total_upcoming;
+        
+        // Get customer info
+        $this->data['customer'] = $this->site->getCompanyByID($customer_id);
+        $this->data['user'] = $user;
+        
+        $this->data['page_title'] = lang('dashboard');
+        $this->data['page_desc'] = lang('user_dashboard');
+        $this->page_construct('user/dashboard', $this->data);
     }
 
     function profile($act = NULL) {
@@ -138,6 +376,10 @@ class Main extends MY_Shop_Controller
                 }
 
                 $this->session->set_flashdata('message', $this->ion_auth->messages());
+                // Redirect customer users to dashboard
+                if ($this->ion_auth->in_group('customer')) {
+                    redirect('dashboard');
+                }
                 $referrer = ($this->session->userdata('requested_page') && $this->session->userdata('requested_page') != 'admin') ? $this->session->userdata('requested_page') : '/';
                 redirect($referrer);
             } else {

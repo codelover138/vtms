@@ -2,8 +2,14 @@
 <script>
 $(document).ready(function() {
     var tTable = $('#INPSSlabsData').dataTable({
-        "aaSorting": [[1, "desc"], [2, "asc"]],
-        "aLengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "<?= lang('all') ?>"]],
+        "aaSorting": [
+            [1, "desc"],
+            [2, "asc"]
+        ],
+        "aLengthMenu": [
+            [10, 25, 50, 100, -1],
+            [10, 25, 50, 100, "<?= lang('all') ?>"]
+        ],
         "iDisplayLength": <?= $Settings->rows_per_page ?>,
         'bProcessing': true,
         'bServerSide': true,
@@ -28,8 +34,7 @@ $(document).ready(function() {
             nRow.id = aData[0];
             return nRow;
         }
-    }).dtFilter([
-        {
+    }).dtFilter([{
             column_number: 1,
             filter_default_label: "[<?= lang('year'); ?>]",
             filter_type: "text",
@@ -50,7 +55,8 @@ $(document).ready(function() {
         <div class="box-icon">
             <ul class="btn-tasks">
                 <li class="dropdown">
-                    <a href="<?= admin_url('tax_calculations/edit_inps_slab') ?>" class="tip" title="<?= lang('add_inps_slab') ?>">
+                    <a href="<?= admin_url('tax_calculations/edit_inps_slab') ?>" class="tip"
+                        title="<?= lang('add_inps_slab') ?>">
                         <i class="icon fa fa-plus"></i>
                     </a>
                 </li>
@@ -61,16 +67,16 @@ $(document).ready(function() {
         <div class="row">
             <div class="col-lg-12">
                 <?php if ($message) { ?>
-                    <div class="alert alert-success">
-                        <button data-dismiss="alert" class="close" type="button">×</button>
-                        <?= is_array($message) ? print_r($message, true) : $message; ?>
-                    </div>
+                <div class="alert alert-success">
+                    <button data-dismiss="alert" class="close" type="button">×</button>
+                    <?= is_array($message) ? print_r($message, true) : $message; ?>
+                </div>
                 <?php } ?>
                 <?php if ($error) { ?>
-                    <div class="alert alert-danger">
-                        <button data-dismiss="alert" class="close" type="button">×</button>
-                        <?= is_array($error) ? print_r($error, true) : $error; ?>
-                    </div>
+                <div class="alert alert-danger">
+                    <button data-dismiss="alert" class="close" type="button">×</button>
+                    <?= is_array($error) ? print_r($error, true) : $error; ?>
+                </div>
                 <?php } ?>
                 <p class="introtext"><?= lang('manage_inps_rate_slabs'); ?></p>
 
@@ -80,7 +86,7 @@ $(document).ready(function() {
                         <thead>
                             <tr class="primary">
                                 <th style="min-width:30px; width: 30px; text-align: center;">
-                                    <input class="checkbox checkth" type="checkbox" name="check" />
+                                    <input class="checkbox checkft" type="checkbox" name="check" />
                                 </th>
                                 <th><?= lang("year"); ?></th>
                                 <th><?= lang("customer_type"); ?></th>
@@ -118,4 +124,3 @@ $(document).ready(function() {
         </div>
     </div>
 </div>
-

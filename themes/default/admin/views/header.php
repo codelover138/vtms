@@ -59,11 +59,7 @@
                     <button class="navbar-toggle btn" type="button" data-toggle="collapse" data-target="#sidebar_menu">
                         <span class="fa fa-bars"></span>
                     </button>
-                    <?php if (SHOP) { ?>
-                    <a href="<?= site_url('/') ?>" class="btn">
-                        <span class="fa fa-shopping-cart"></span>
-                    </a>
-                    <?php } ?>
+
                     <a href="<?= admin_url('calendar') ?>" class="btn">
                         <span class="fa fa-calendar"></span>
                     </a>
@@ -109,13 +105,10 @@
                     </ul>
                     <ul class="nav navbar-nav pull-right">
                         <li class="dropdown hidden-xs"><a class="btn tip" title="<?= lang('dashboard') ?>"
-                                data-placement="bottom" href="<?= admin_url('welcome') ?>"><i
+                                data-placement="bottom"
+                                href="<?= ($this->Customer ? site_url(uri: 'dashboard') : admin_url('welcome'));?>"><i
                                     class="fa fa-dashboard"></i></a></li>
-                        <?php if (SHOP) { ?>
-                        <li class="dropdown hidden-xs"><a class="btn tip" title="<?= lang('shop') ?>"
-                                data-placement="bottom" href="<?= base_url() ?>"><i class="fa fa-shopping-cart"></i></a>
-                        </li>
-                        <?php } ?>
+
                         <?php if ($Owner) { ?>
                         <li class="dropdown hidden-sm">
                             <a class="btn tip" title="<?= lang('settings') ?>" data-placement="bottom"
@@ -135,30 +128,7 @@
                                 </li>
                             </ul>
                         </li>
-                        <?php if ($hold_sales) { ?>
-                        <li class="dropdown hidden-sm">
-                            <a class="btn tip" title="<?= lang('Sales_Info') ?>" data-placement="bottom" href="#"
-                                data-toggle="dropdown">
-                                <i class="fa fa-info-circle"></i>
-                                <span class="number blightOrange black"><?= sizeof($hold_sales) ?></span>
-                            </a>
-                            <ul class="dropdown-menu pull-right content-scroll">
-                                <li class="dropdown-header"><i class="fa fa-info-circle"></i>
-                                    <?= lang('Status_Hold'); ?></li>
-                                <li class="dropdown-content">
-                                    <div class="scroll-div">
-                                        <div class="top-menu-scroll">
-                                            <ol class="oe">
-                                                <?php foreach ($hold_sales as $n) {
-                                                    echo '<li>' . $n->reference_no . '</li>';
-                                                } ?>
-                                            </ol>
-                                        </div>
-                                    </div>
-                                </li>
-                            </ul>
-                        </li>
-                        <?php } ?>
+
                         <?php if ($info) { ?>
                         <li class="dropdown hidden-sm">
                             <a class="btn tip" title="<?= lang('notifications') ?>" data-placement="bottom" href="#"
@@ -287,10 +257,18 @@
                                 <div class="sidebar-nav nav-collapse collapse navbar-collapse" id="sidebar_menu">
                                     <ul class="nav main-menu">
                                         <li class="mm_welcome">
+                                            <?php if ($this->Customer) { ?>
+                                            <a href="<?=  site_url('dashboard') ?>">
+                                                <i class="fa fa-dashboard"></i>
+                                                <span class="text"> <?= lang('dashboard'); ?></span>
+                                            </a>
+
+                                            <?php }else{ ?>
                                             <a href="<?= admin_url() ?>">
                                                 <i class="fa fa-dashboard"></i>
                                                 <span class="text"> <?= lang('dashboard'); ?></span>
                                             </a>
+                                            <?php } ?>
                                         </li>
 
                                         <?php
@@ -388,7 +366,7 @@
                                                             <?= lang('list_transfers'); ?></span>
                                                     </a>
                                                 </li>
-                                                <li id="transfer_by_fattura_privati">
+                                                <li id="transfers_transfer_by_fattura_privati">
                                                     <a class="submenu"
                                                         href="<?= admin_url('transfers/transfer_by_fattura_privati'); ?>">
                                                         <i class="fa fa-plus-circle"></i><span class="text">
@@ -411,10 +389,10 @@
                                                 <span class="chevron closed"></span>
                                             </a>
                                             <ul>
-                                                <li id="tax_calculations">
+                                                <li id="tax_calculations_index">
                                                     <a class="submenu" href="<?= admin_url('tax_calculations'); ?>">
                                                         <i class="fa fa-star-o"></i><span class="text">
-                                                            <?= lang('tax_calculations'); ?></span>
+                                                            <?= lang('list_tax_calculations'); ?></span>
                                                     </a>
                                                 </li>
                                                 <li id="tax_calculations_inps_slabs">

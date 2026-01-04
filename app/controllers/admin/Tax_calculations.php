@@ -54,25 +54,38 @@ class Tax_calculations extends MY_Controller
             ->from("companies")
             ->where('group_name', 'customer');
 
-        $view_link = anchor('admin/tax_calculations/view?customer_id=$1', '<i class="fa fa-eye"></i> ' . lang('view'), 'class="tip" title="' . lang('view_tax_calculations') . '"');
-        $settings_link = anchor('admin/tax_calculations/settings?customer_id=$1', '<i class="fa fa-cog"></i> ' . lang('settings'), 'class="tip" title="' . lang('tax_settings') . '"');
+        $view_link = anchor('admin/tax_calculations/view?customer_id=$1', '<i class="fa fa-eye"></i> ' . lang('view_tax_calculations'), 'class="tip"');
+        $settings_link = anchor('admin/tax_calculations/settings?customer_id=$1', '<i class="fa fa-cog"></i> ' . lang('tax_settings'), 'class="tip"');
+        $calculate_link = '<a href="#" class="calculate-tax-btn tip" data-customer-id="$1" data-year="' . date('Y') . '" title="' . lang('calculate_tax') . '"><i class="fa fa-calculator"></i> ' . lang('calculate_tax') . '</a>';
         
         $action = '<div class="text-center">
             <div class="btn-group">
-                ' . $view_link . '
-                ' . $settings_link . '
-            </div>
-            <div class="btn-group" style="margin-top:5px;">
-                <input type="number" class="year-input form-control input-sm" 
-                       data-customer-id="$1" 
-                       value="' . date('Y') . '" 
-                       style="width:80px; display:inline-block; margin-right:5px;" 
-                       min="2000" max="2100">
-                <a href="#" class="btn btn-success btn-xs calculate-tax-btn" 
-                   data-customer-id="$1" 
-                   title="' . lang('calculate_tax') . '">
-                    <i class="fa fa-calculator"></i> ' . lang('calculate') . '
-                </a>
+                <button type="button" class="btn btn-default btn-xs btn-primary dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+                    <i class="fa fa-cog"></i> <span class="caret"></span>
+                </button>
+                <ul class="dropdown-menu pull-right" role="menu">
+                    <li>' . $view_link . '</li>
+                    <li>' . $settings_link . '</li>
+                    <li class="divider"></li>
+                    <li class="dropdown-header"><i class="fa fa-calculator"></i> ' . lang('calculate_tax') . '</li>
+                    <li style="padding: 8px 15px;">
+                        <div class="input-group" style="width: 100%;">
+                            <input type="number" class="form-control input-sm year-input" 
+                                   data-customer-id="$1" 
+                                   value="' . date('Y') . '" 
+                                   min="2000" max="2100" 
+                                   style="width: 70px; display: inline-block;">
+                            <span class="input-group-btn" style="width: auto;">
+                                <button class="btn btn-success btn-xs calculate-tax-btn" 
+                                        type="button"
+                                        data-customer-id="$1" 
+                                        title="' . lang('calculate') . '">
+                                    <i class="fa fa-calculator"></i>
+                                </button>
+                            </span>
+                        </div>
+                    </li>
+                </ul>
             </div>
         </div>';
 

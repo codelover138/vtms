@@ -144,6 +144,9 @@ $lang['Transfer_By_Fattura']                = "Transfer By Fattura";
 $lang['Add_Transfer_By_Fattura']            = "Add Transfer By Fattura";
 $lang['Transfer_By_Fattura_Privati']         = "Transfer By Fattura Privati";
 $lang['Add_Transfer_By_Fattura_Privati']     = "Add Transfer By Fattura Privati";
+$lang['tax_calculations']                   = "Tax Calculations";
+$lang['list_tax_calculations']                   = "List Tax Calculations";
+$lang['inps_slabs']                         = "INPS Slabs";
 $lang['people']                             = "People";
 $lang['list_users']                         = "List Users";
 $lang['new_user']                           = "Add User";
@@ -626,5 +629,3 @@ $lang['profit_share_marketing']             = "Profit Share %(Marketing Officer)
 $lang['consent_download']                   = "Download Consent";
 $lang['consent']                            = "Consent";
 $lang['consent_note']                       = "I, <b>{name}</b>, hereby give my consent to perform the service <b>{task}</b>. I understand the scope of the work and authorize <b>{warehouse}</b> to proceed with the specified tasks.";
-
-

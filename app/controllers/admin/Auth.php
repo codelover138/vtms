@@ -191,8 +191,21 @@ class Auth extends MY_Controller
     function login($m = NULL)
     {
         if ($this->loggedIn) {
+            // If customer is logged in, redirect to dashboard instead of admin welcome
+            if ($this->Customer) {
+                redirect('dashboard');
+            }
+            // If already logged in as admin/staff, redirect to admin welcome
+            if ($this->Staff || $this->Owner || $this->Admin) {
+                admin_redirect('welcome');
+            }
             $this->session->set_flashdata('error', $this->session->flashdata('error'));
             admin_redirect('welcome');
+        }
+        
+        // If customer tries to access admin login, redirect them to frontend login
+        if ($this->input->get('customer') || $this->input->post('customer')) {
+            redirect('login');
         }
         $this->data['title'] = lang('login');
 
@@ -211,17 +224,31 @@ class Auth extends MY_Controller
                         admin_redirect('auth/logout');
                     }
                 }
-                if ($this->ion_auth->in_group('customer') || $this->ion_auth->in_group('supplier')) {
-                    if(file_exists(APPPATH.'controllers'.DIRECTORY_SEPARATOR.'shop'.DIRECTORY_SEPARATOR.'Shop.php')) {
-                        $this->session->set_flashdata('message', $this->ion_auth->messages());
-                        redirect(base_url());
+                // Check user groups after login
+                $is_customer = $this->ion_auth->in_group('customer');
+                $is_supplier = $this->ion_auth->in_group('supplier');
+                $is_staff = !$is_customer && !$is_supplier;
+                
+                if ($is_customer || $is_supplier) {
+                    $this->session->set_flashdata('message', $this->ion_auth->messages());
+                    // Redirect customer users to dashboard, supplier to home
+                    if ($is_customer) {
+                        redirect('dashboard');
                     } else {
-                        admin_redirect('auth/logout/1');
+                        redirect(base_url());
                     }
                 }
+                
+                // For admin/staff users, redirect to admin welcome
+                if ($is_staff) {
+                    $this->session->set_flashdata('message', $this->ion_auth->messages());
+                    $referrer = ($this->session->userdata('requested_page') && $this->session->userdata('requested_page') != 'admin') ? $this->session->userdata('requested_page') : 'welcome';
+                    admin_redirect($referrer);
+                }
+                
+                // Fallback redirect
                 $this->session->set_flashdata('message', $this->ion_auth->messages());
-                $referrer = ($this->session->userdata('requested_page') && $this->session->userdata('requested_page') != 'admin') ? $this->session->userdata('requested_page') : 'welcome';
-                admin_redirect($referrer);
+                admin_redirect('welcome');
             } else {
                 $this->session->set_flashdata('error', $this->ion_auth->errors());
                 admin_redirect('login');
@@ -276,7 +303,9 @@ class Auth extends MY_Controller
             $this->data['allow_reg'] = $this->Settings->allow_reg;
             if ($m == 'db') {
                 $this->data['message'] = lang('db_restored');
-            } elseif ($m) {
+            } elseif ($m && $m != '1') {
+                // Only show under development for specific error cases, not for logout redirects
+                // '1' is used for logout redirects, so skip showing the message for that
                 $this->data['error'] = lang('we_are_sorry_as_this_sction_is_still_under_development.');
             }
 

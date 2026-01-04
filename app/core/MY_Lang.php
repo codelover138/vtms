@@ -36,6 +36,11 @@ class MY_Lang extends CI_Lang {
 			$idiom = empty($config['language']) ? 'english' : $config['language'];
 		}
 
+		// If German is requested but not available, fallback to English
+		if ($idiom === 'german') {
+			$idiom = 'english';
+		}
+
 		if ($return === FALSE && isset($this->is_loaded[$langfile]) && $this->is_loaded[$langfile] === $idiom) {
 			return;
 		}
@@ -58,6 +63,25 @@ class MY_Lang extends CI_Lang {
 					include($package_path);
 					$found = TRUE;
 					break;
+				}
+			}
+		}
+
+		// If file not found and it's not German (already handled above), try English as fallback
+		if ($found !== TRUE && $idiom !== 'english') {
+			$fallback_idiom = 'english';
+			$basepath = BASEPATH.'language/'.$fallback_idiom.'/'.($path ? $path.'/' : '').$langfile;
+			if (file_exists($basepath)) {
+				include($basepath);
+				$found = TRUE;
+			} else {
+				foreach (get_instance()->load->get_package_paths(TRUE) as $package_path) {
+					$package_path .= 'language/'.$fallback_idiom.'/'.($path ? $path.'/' : '').$langfile;
+					if ($basepath !== $package_path && file_exists($package_path)) {
+						include($package_path);
+						$found = TRUE;
+						break;
+					}
 				}
 			}
 		}

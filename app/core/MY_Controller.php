@@ -7,13 +7,22 @@ class MY_Controller extends CI_Controller {
         parent::__construct();
         $this->Settings = $this->site->get_setting();
         if($sma_language = $this->input->cookie('sma_language', TRUE)) {
+            // If German is selected but not available, use English
+            if ($sma_language === 'german') {
+                $sma_language = 'english';
+            }
             $this->config->set_item('language', $sma_language);
             $this->lang->admin_load('sma', $sma_language);
             $this->Settings->user_language = $sma_language;
         } else {
-            $this->config->set_item('language', $this->Settings->language);
-            $this->lang->admin_load('sma', $this->Settings->language);
-            $this->Settings->user_language = $this->Settings->language;
+            $default_language = $this->Settings->language;
+            // If German is set as default but not available, use English
+            if ($default_language === 'german') {
+                $default_language = 'english';
+            }
+            $this->config->set_item('language', $default_language);
+            $this->lang->admin_load('sma', $default_language);
+            $this->Settings->user_language = $default_language;
         }
         if($rtl_support = $this->input->cookie('sma_rtl_support', TRUE)) {
             $this->Settings->user_rtl = $rtl_support;
@@ -73,8 +82,13 @@ class MY_Controller extends CI_Controller {
             }
             if(!$this->Owner && !$this->Admin) {
                 $gp = $this->site->checkPermissions();
-                $this->GP = $gp[0];
-                $this->data['GP'] = $gp[0];
+                if ($gp && is_array($gp) && isset($gp[0])) {
+                    $this->GP = $gp[0];
+                    $this->data['GP'] = $gp[0];
+                } else {
+                    $this->GP = array();
+                    $this->data['GP'] = array();
+                }
             } else {
                 $this->data['GP'] = NULL;
             }
@@ -100,7 +114,7 @@ class MY_Controller extends CI_Controller {
 
     function page_construct($page, $meta = array(), $data = array()) {
         $meta['message'] = isset($data['message']) ? $data['message'] : $this->session->flashdata('message');
-        $meta['error'] = isset($data['error']) ? $data['error'] : $this->session->flashdata('error');
+        $meta['error'] = isset($data['error']) ? $data['error'] : '';
         $meta['warning'] = isset($data['warning']) ? $data['warning'] : $this->session->flashdata('warning');
         $this->session->set_flashdata('message', '');
         $this->session->set_flashdata('error', '');
