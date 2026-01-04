@@ -634,6 +634,163 @@ class Transfers extends MY_Controller
         return floatval($cleaned);
     }
 
+    public function transfer_by_fattura_privati()
+    {
+        $this->sma->checkPermissions('csv');
+        $this->load->helper('security');
+        $this->form_validation->set_message('is_natural_no_zero', lang('no_zero_required'));
+        $this->form_validation->set_rules('customer', lang("customer"), 'required');
+        $this->form_validation->set_rules('csv_file', lang('upload_file'), 'xss_clean');
+
+        if ($this->form_validation->run()) {
+            $transfer_no = $this->input->post('reference_no') ? $this->input->post('reference_no') : $this->site->getReference('to');
+            $customer_id = $this->input->post('customer');
+            $customer_details = $this->site->getCompanyByID($customer_id);
+            $customer = $customer_details->name . ' ' .$customer_details->last_name;
+            $data = array(
+                'reference_no' => $transfer_no,
+                'customer_id' => $customer_id,
+                'customer_name' => $customer,
+                'created_by' => $this->session->userdata('user_id'),
+                );
+            
+            if (isset($_FILES['userfile'])) {
+                $config['upload_path']   = $this->digital_upload_path;
+                $config['allowed_types'] = 'csv';
+                $config['max_size']      = $this->allowed_file_size;
+                $config['overwrite']     = true;
+                $this->load->library('upload', $config);
+                $this->upload->initialize($config);
+
+                if (!$this->upload->do_upload()) {
+                    $error = $this->upload->display_errors();
+                    $this->session->set_flashdata('error', $error);
+                    admin_redirect('transfers/transfer_by_fattura_privati');
+                
+                }
+
+                $csv = $this->upload->file_name;
+               
+                $data=$this->read_and_save_csv_privati($this->digital_upload_path . $csv,$data);
+                $id_sending_list = array_column($data['cleaned_data'], 'id_sending');
+                $isExist=$this->transfers_model->checkDuplicateData($id_sending_list,$data['cleaned_data']);
+                if($isExist !== ''){
+                    $this->session->set_flashdata('error', 'Duplicate Data:'. ' '.$isExist);
+                    redirect($_SERVER['HTTP_REFERER']);
+                }
+            }
+
+        }
+
+        if ($this->form_validation->run() == true && $this->transfers_model->savePrivatiData($data,$transfer_no)) {
+            $this->session->set_userdata('remove_tols', 1);
+            $this->session->set_flashdata('message', lang('Data_added.'));
+            admin_redirect('transfers');
+        } else {
+            $this->data['error'] = (validation_errors() ? validation_errors() : $this->session->flashdata('error'));
+            $this->data['rnumber']    = $this->site->getReference('to');
+            $bc   = [['link' => base_url(), 'page' => lang('home')], ['link' => admin_url('transfers'), 'page' => lang('transfers')], ['link' => '#', 'page' => lang('Add_Transfer_By_Fattura_Privati')]];
+            $meta = ['page_title' => lang('Add_Transfer_By_Fattura_Privati'), 'bc' => $bc];
+            $this->page_construct('transfers/transfer_by_fattura_privati', $meta, $this->data);
+        }
+    }
+
+    private function read_and_save_csv_privati($file_path,$obj) {
+        try {
+            // Read CSV file with semicolon delimiter
+            $handle = fopen($file_path, 'r');
+            if ($handle === FALSE) {
+                throw new Exception('Cannot open file: ' . $file_path);
+            }
+
+            // Read header row
+            $header = fgetcsv($handle, 0, ';');
+            
+            $expected_header = [
+                'Id invio',
+                'Matricola dispositivo',
+                'Data e ora rilevazione',
+                'Data e ora trasmissione',
+                'Ammontare delle vendite (totale in euro)',
+                'Imponibile vendite (totale in euro)',
+                'Imposta vendite (totale in euro)',
+                'Periodo di inattivita\' da',
+                'Periodo di inattivita\' a'
+            ];
+
+            // Validate the header
+            if ($header !== $expected_header) {
+                fclose($handle);
+                $this->session->set_flashdata('error', 'The CSV format does not match the expected structure.');
+                redirect($_SERVER['HTTP_REFERER']);
+            }
+    
+            $insert_data = [];
+            $cleaned_data = [];
+
+            // Read data rows
+            while (($row = fgetcsv($handle, 0, ';')) !== FALSE) {
+                if (count($row) < 9) continue; // Skip incomplete rows
+                
+                // Clean and check sales and tax values
+                $sales_amount = $this->clean_decimal($row[4]);
+                $tax_amount = $this->clean_decimal($row[6]);
+                
+                // Skip rows where both sales amount and tax amount are zero
+                if ($sales_amount == 0 && $tax_amount == 0) {
+                    continue;
+                }
+                
+                // Clean other decimal values
+                $imponibile_vendite = $this->clean_decimal($row[5]);
+                
+                $insert_data[] = [
+                    'id_invio' => $row[0] ? trim($row[0]) : '',
+                    'matricola_dispositivo' => $row[1] ? trim($row[1]) : '',
+                    'data_ora_rilevazione' => $this->format_date($row[2]),
+                    'data_ora_trasmissione' => $this->format_date($row[3]),
+                    'ammontare_vendite' => $sales_amount,
+                    'imponibile_vendite' => $imponibile_vendite,
+                    'imposta_vendite' => $tax_amount,
+                    'periodo_inattivita_da' => $row[7] ? $this->format_date($row[7]) : NULL,
+                    'periodo_inattivita_a' => $row[8] ? $this->format_date($row[8]) : NULL,
+                    'created_by' => $this->session->userdata('user_id'),
+                    'customer_id' => $obj['customer_id'],
+                    'customer_name' => $obj['customer_name'],
+                    'reference_no' => $obj['reference_no'],
+                ];
+
+                $cleaned_data[] = [
+                    'id_sending' => $row[0] ? trim($row[0]) : '',
+                    'device_number' => $row[1] ? trim($row[1]) : '',
+                    'date_detection' => $this->format_date($row[2]),
+                    'date_transmission' => $this->format_date($row[3]),
+                    'sales_amount' => $sales_amount,
+                    'taxable_sales' => $imponibile_vendite,
+                    'sale_taxes' => $tax_amount,
+                    'periodo_inattivita_da' => $row[7] ? $this->format_date($row[7]) : NULL,
+                    'periodo_inattivita_a' => $row[8] ? $this->format_date($row[8]) : NULL,
+                    'created_by' => $this->session->userdata('user_id'),
+                    'customer_id' => $obj['customer_id'],
+                    'customer_name' => $obj['customer_name'],
+                    'reference_no' => $obj['reference_no'],
+                    'pos' => 2, // Set pos to 2 for privati
+                ];
+            }
+            
+            fclose($handle);
+        
+        } catch (Exception $e) {
+            if (isset($handle) && $handle !== FALSE) {
+                fclose($handle);
+            }
+            $this->session->set_flashdata('error', 'Error reading the CSV file: ' . $e->getMessage());
+            redirect($_SERVER['HTTP_REFERER']);
+        }
+        
+        return array('cleaned_data'=>$cleaned_data,'insert_data'=>$insert_data);
+    }
+
     public function update_status($id)
     {
         $this->form_validation->set_rules('status', lang('status'), 'required');

@@ -260,10 +260,10 @@ class Tax_calculations_model extends CI_Model
 
     /**
      * Get INPS rate for taxable income
-     * @param decimal $taxable_income The taxable income amount
+     * @param float $taxable_income The taxable income amount
      * @param int $year The tax year (defaults to current year)
      * @param string $customer_type The customer type (Gestione Separata, Commercianti, Artigiani, or NULL for all)
-     * @return object|FALSE The rate slab object or FALSE if not found
+     * @return object|bool The rate slab object or FALSE if not found
      */
     public function getINPSRate($taxable_income, $year = NULL, $customer_type = NULL)
     {
@@ -296,6 +296,80 @@ class Tax_calculations_model extends CI_Model
     }
 
     /**
+     * Get all applicable INPS rate slabs for progressive calculation
+     * @param float $taxable_income The taxable income amount
+     * @param int $year The tax year (defaults to current year)
+     * @param string $customer_type The customer type (Gestione Separata, Commercianti, Artigiani, or NULL for all)
+     * @return array Array of rate slab objects ordered by income_from ASC
+     */
+    public function getAllApplicableINPSSlabs($taxable_income, $year = NULL, $customer_type = NULL)
+    {
+        if ($year === NULL) {
+            $year = date('Y');
+        }
+        
+        // Get all active slabs for the year that start at or before the taxable income
+        $this->db->where('slab_year', $year);
+        $this->db->where('income_from <=', $taxable_income);
+        $this->db->where('is_active', 1);
+        
+        // Filter by customer_type if provided, otherwise get slabs that apply to all (NULL) or match the customer type
+        if ($customer_type !== NULL) {
+            $this->db->group_start();
+            $this->db->where('customer_type', $customer_type);
+            $this->db->or_where('customer_type IS NULL', NULL, FALSE);
+            $this->db->group_end();
+        }
+        
+        // Order by customer_type NULL last (so specific customer_type slabs take precedence over generic ones)
+        // Then order by income_from ASC for progressive calculation
+        $this->db->order_by('customer_type IS NULL', 'ASC', FALSE);
+        $this->db->order_by('income_from', 'ASC');
+        $q = $this->db->get('inps_rate_slabs');
+
+        if ($q->num_rows() > 0) {
+            $all_slabs = $q->result();
+            
+            // Filter to get only slabs that overlap with the income range (0 to taxable_income)
+            // and remove duplicates by keeping the most specific customer_type for each income_from
+            $applicable_slabs = array();
+            $seen_income_from = array();
+            
+            foreach ($all_slabs as $slab) {
+                // Check if slab range overlaps with 0 to taxable_income
+                $slab_from = (float)$slab->income_from;
+                $slab_to = ($slab->income_to !== NULL) ? (float)$slab->income_to : PHP_INT_MAX;
+                
+                // Slab applies if it overlaps with the income range (0 to taxable_income)
+                // We want slabs that start at or before the taxable income
+                if ($slab_from > $taxable_income) {
+                    continue; // Slab starts after taxable income, skip it
+                }
+                // If slab has an upper limit, it should be valid (to >= from)
+                if ($slab->income_to !== NULL && $slab_to < $slab_from) {
+                    continue; // Invalid slab range
+                }
+                
+                // For each income_from, prefer specific customer_type over NULL
+                $key = (string)$slab->income_from;
+                if (!isset($seen_income_from[$key]) || 
+                    ($seen_income_from[$key]->customer_type === NULL && $slab->customer_type !== NULL)) {
+                    $seen_income_from[$key] = $slab;
+                }
+            }
+            
+            // Convert to array and sort by income_from
+            $applicable_slabs = array_values($seen_income_from);
+            usort($applicable_slabs, function($a, $b) {
+                return (float)$a->income_from <=> (float)$b->income_from;
+            });
+            
+            return $applicable_slabs;
+        }
+        return array();
+    }
+
+    /**
      * Calculate INPS for a customer for a given year
      */
     public function calculateINPSForYear($customer_id, $year)
@@ -313,23 +387,108 @@ class Tax_calculations_model extends CI_Model
         // Get taxable income (67% of total sales as per example)
         // Using taxable_income from tax calculation, but INPS uses different calculation
         // According to the doc: Taxable: €50,000 × 67% = €33,500
-        $total_sales = $tax_calc->total_sales;
-        $inps_taxable_income = $total_sales * 0.67;
+        $inps_taxable_income = $tax_calc->taxable_income;
 
-        // Get INPS rate for the specific year and customer type
+        // Get all applicable INPS slabs for progressive calculation
         $customer_type = $customer->customer_type ? $customer->customer_type : NULL;
-        $rate_slab = $this->getINPSRate($inps_taxable_income, $year, $customer_type);
-        if (!$rate_slab) {
+        $slabs = $this->getAllApplicableINPSSlabs($inps_taxable_income, $year, $customer_type);
+        
+        // If no slabs found, try to get at least one slab using the old method as fallback
+        if (empty($slabs)) {
+            $rate_slab = $this->getINPSRate($inps_taxable_income, $year, $customer_type);
+            if ($rate_slab) {
+                // Convert single slab to array format for consistency
+                $slabs = array($rate_slab);
+            } else {
+                // Log error for debugging
+                log_message('error', 'INPS Calculation Failed: No slabs found for customer_id=' . $customer_id . ', year=' . $year . ', taxable_income=' . $inps_taxable_income . ', customer_type=' . $customer_type);
+                return FALSE;
+            }
+        }
+        
+        // Ensure we have at least one slab
+        if (empty($slabs)) {
+            log_message('error', 'INPS Calculation Failed: Empty slabs array for customer_id=' . $customer_id . ', year=' . $year);
             return FALSE;
         }
 
-        // Calculate INPS amount
-        if ($rate_slab->fixed_amount && $inps_taxable_income <= 18555) {
-            $inps_amount = $rate_slab->fixed_amount;
-            $inps_rate = 0;
-        } else {
-            $inps_rate = $rate_slab->inps_rate;
-            $inps_amount = $inps_taxable_income * $inps_rate / 100;
+        // Calculate INPS amount using progressive slab-based calculation
+        // Based on the example table:
+        // - Row 1: start=0, end=15000, amount=15000, inps=3000, %=20%
+        // - Row 2: start=15001, end=17999, amount=2998, inps=667.055, %=22.25%
+        // - Row 3: start=18000, end=18401.67, amount=401.67, inps=97.40497, %=24.25%
+        // Total = 3764.46
+        
+        $inps_amount = 0;
+        $inps_rate = 0;
+        $slab_details = array();
+        
+        foreach ($slabs as $index => $slab) {
+            // Determine the income range for this slab
+            $slab_from = (float)$slab->income_from;
+            $slab_to = ($slab->income_to !== NULL) ? (float)$slab->income_to : PHP_INT_MAX;
+            
+            // The range starts at the slab's income_from
+            $range_start = $slab_from;
+            
+            // The range ends at the minimum of: taxable income, or this slab's upper limit
+            $range_end = min($inps_taxable_income, $slab_to);
+            
+            // Skip this slab if the taxable income is below the slab's start
+            if ($inps_taxable_income < $slab_from) {
+                continue;
+            }
+            
+            // Calculate how much income falls in this slab's range
+            // Amount = end - start (as shown in the example table)
+            $slab_income = max(0, $range_end - $range_start);
+            
+            if ($slab_income <= 0) {
+                continue;
+            }
+            
+            // Calculate tax for this slab
+            $slab_tax = 0;
+            $slab_rate = 0;
+            
+            // Check if fixed_amount should be used (only for first slab when income is within fixed amount range)
+            if ($slab->fixed_amount > 0 && $index === 0 && $inps_taxable_income <= $slab_to) {
+                // Use fixed amount for the first slab if it exists
+                $slab_tax = (float)$slab->fixed_amount;
+                $slab_rate = 0;
+            } else {
+                // Calculate percentage-wise for this slab portion
+                $slab_rate = (float)$slab->inps_rate;
+                $slab_tax = $slab_income * $slab_rate / 100;
+            }
+            
+            $inps_amount += $slab_tax;
+            
+            // Store slab details for reference
+            $slab_details[] = array(
+                'from' => $range_start,
+                'to' => $range_end,
+                'income' => $slab_income,
+                'rate' => $slab_rate,
+                'tax' => $slab_tax,
+                'fixed_amount' => $slab->fixed_amount
+            );
+            
+            // If we've covered all income, break
+            if ($range_end >= $inps_taxable_income) {
+                break;
+            }
+        }
+        
+        // Calculate average rate for reporting
+        if ($inps_taxable_income > 0 && $inps_amount > 0) {
+            $inps_rate = ($inps_amount / $inps_taxable_income) * 100;
+        }
+        
+        // Ensure we have calculated something (even if amount is 0, we should have slab_details)
+        if (empty($slab_details)) {
+            log_message('error', 'INPS Calculation Failed: No slab details calculated for customer_id=' . $customer_id . ', year=' . $year . ', taxable_income=' . $inps_taxable_income);
+            return FALSE;
         }
 
         // Check if eligible for 35% discount (Commercianti/Artigiani)
@@ -350,7 +509,8 @@ class Tax_calculations_model extends CI_Model
             'inps_amount' => $inps_amount,
             'discount_percentage' => $discount_percentage,
             'discount_amount' => $discount_amount,
-            'inps_amount_after_discount' => $inps_amount_after_discount
+            'inps_amount_after_discount' => $inps_amount_after_discount,
+            'slab_details' => $slab_details // Include detailed slab breakdown for display
         );
     }
 
@@ -359,10 +519,30 @@ class Tax_calculations_model extends CI_Model
      */
     public function saveINPSCalculation($data)
     {
+        // Convert slab_details array to JSON for storage
+        $slab_details_json = null;
+        if (isset($data['slab_details'])) {
+            if (is_array($data['slab_details'])) {
+                $slab_details_json = json_encode($data['slab_details']);
+            } else {
+                $slab_details_json = $data['slab_details'];
+            }
+            unset($data['slab_details']); // Remove from data array temporarily
+        }
+        
         $existing = $this->db->get_where('inps_calculations', array(
             'customer_id' => $data['customer_id'],
             'tax_year' => $data['tax_year']
         ), 1);
+
+        // Check if slab_details column exists in the table
+        $columns = $this->db->list_fields('inps_calculations');
+        $has_slab_details_column = in_array('slab_details', $columns);
+        
+        // Add slab_details back if column exists
+        if ($has_slab_details_column && $slab_details_json !== null) {
+            $data['slab_details'] = $slab_details_json;
+        }
 
         if ($existing->num_rows() > 0) {
             $this->db->where('customer_id', $data['customer_id']);
@@ -505,6 +685,155 @@ class Tax_calculations_model extends CI_Model
     }
 
     /**
+     * Calculate INAIL for Artigiani customer for a given year
+     * INAIL is calculated as: Taxable Income × 60% × INAIL Rate
+     * But minimum payment applies if calculated amount is less than minimum
+     */
+    public function calculateINAILForYear($customer_id, $year)
+    {
+        $customer = $this->getCustomerTaxSettings($customer_id);
+        if (!$customer) {
+            return FALSE;
+        }
+
+        // INAIL is only for Artigiani
+        if ($customer->customer_type !== 'Artigiani') {
+            return FALSE;
+        }
+
+        // Check if INAIL settings are configured
+        if (empty($customer->inail_rate) || empty($customer->inail_minimum_payment)) {
+            return FALSE;
+        }
+
+        $tax_calc = $this->getTaxCalculation($customer_id, $year);
+        if (!$tax_calc) {
+            return FALSE;
+        }
+
+        
+        // Calculate INAIL base: Taxable Income × 60%
+        $inail_base_amount = $tax_calc->taxable_income;
+        
+        // Calculate INAIL amount: Base × Rate
+        $inail_rate = (float)$customer->inail_rate;
+        $inail_calculated_amount = $inail_base_amount * $inail_rate / 100;
+        
+        // Apply minimum payment if calculated amount is less than minimum
+        $inail_minimum_payment = (float)$customer->inail_minimum_payment;
+        $inail_final_amount = max($inail_calculated_amount, $inail_minimum_payment);
+
+        return array(
+            'customer_id' => $customer_id,
+            'tax_year' => $year,
+            'taxable_income' => $inail_base_amount,
+            'inail_coefficient' => $customer->coefficient_of_profitability,
+            'inail_base_amount' => $inail_base_amount,
+            'inail_rate' => $inail_rate,
+            'inail_calculated_amount' => $inail_calculated_amount,
+            'inail_minimum_payment' => $inail_minimum_payment,
+            'inail_final_amount' => $inail_final_amount,
+            'ateco_code' => $customer->inail_ateco_code
+        );
+    }
+
+    /**
+     * Save INAIL calculation
+     */
+    public function saveINAILCalculation($data)
+    {
+        $existing = $this->db->get_where('inail_calculations', array(
+            'customer_id' => $data['customer_id'],
+            'tax_year' => $data['tax_year']
+        ), 1);
+
+        if ($existing->num_rows() > 0) {
+            $this->db->where('customer_id', $data['customer_id']);
+            $this->db->where('tax_year', $data['tax_year']);
+            return $this->db->update('inail_calculations', $data);
+        } else {
+            return $this->db->insert('inail_calculations', $data);
+        }
+    }
+
+    /**
+     * Calculate and save INAIL payment (1 payment per year, due February 16 of following year)
+     */
+    public function calculateAndSaveINAILPayment($customer_id, $year, $inail_calculation_id = NULL)
+    {
+        $inail_calc = $this->db->get_where('inail_calculations', array(
+            'customer_id' => $customer_id,
+            'tax_year' => $year
+        ), 1)->row();
+
+        if (!$inail_calc) {
+            return FALSE;
+        }
+
+        // INAIL payment is due February 16 of the following year
+        // Example: For 2024 work, payment is due February 16, 2025
+        $due_date = ($year + 1) . '-02-16';
+
+        $payment = array(
+            'customer_id' => $customer_id,
+            'inail_calculation_id' => $inail_calculation_id,
+            'payment_year' => $year,
+            'due_date' => $due_date,
+            'amount' => $inail_calc->inail_final_amount,
+            'paid_amount' => 0,
+            'status' => 'pending'
+        );
+
+        // Check if payment already exists
+        $existing = $this->db->get_where('inail_payments', array(
+            'customer_id' => $customer_id,
+            'payment_year' => $year
+        ), 1);
+
+        if ($existing->num_rows() > 0) {
+            $this->db->where('customer_id', $customer_id);
+            $this->db->where('payment_year', $year);
+            return $this->db->update('inail_payments', $payment);
+        } else {
+            return $this->db->insert('inail_payments', $payment);
+        }
+    }
+
+    /**
+     * Get INAIL calculation for a customer and year
+     */
+    public function getINAILCalculation($customer_id, $year)
+    {
+        $q = $this->db->get_where('inail_calculations', array(
+            'customer_id' => $customer_id,
+            'tax_year' => $year
+        ), 1);
+        
+        if ($q->num_rows() > 0) {
+            return $q->row();
+        }
+        return FALSE;
+    }
+
+    /**
+     * Get all INAIL payments for a customer
+     */
+    public function getAllINAILPayments($customer_id, $year = NULL)
+    {
+        $this->db->where('customer_id', $customer_id);
+        if ($year) {
+            $this->db->where('payment_year', $year);
+        }
+        $this->db->order_by('due_date', 'ASC');
+        $q = $this->db->get('inail_payments');
+        
+        if ($q->num_rows() > 0) {
+            return $q->result();
+        }
+        return array();
+    }
+
+    /**
      * Process tax calculation for a customer for a year
      * This is the main method that orchestrates the entire calculation
      */
@@ -526,18 +855,310 @@ class Tax_calculations_model extends CI_Model
         // Calculate INPS
         $inps_data = $this->calculateINPSForYear($customer_id, $year);
         if ($inps_data) {
-            $this->saveINPSCalculation($inps_data);
-            $inps_calc = $this->db->get_where('inps_calculations', array(
+            $save_result = $this->saveINPSCalculation($inps_data);
+            if ($save_result) {
+                $inps_calc = $this->db->get_where('inps_calculations', array(
+                    'customer_id' => $customer_id,
+                    'tax_year' => $year
+                ), 1)->row();
+                
+                if ($inps_calc) {
+                    $this->calculateAndSaveINPSPayments($customer_id, $year, $inps_calc->id);
+                }
+            } else {
+                log_message('error', 'INPS Save Failed: Could not save INPS calculation for customer_id=' . $customer_id . ', year=' . $year);
+            }
+        } else {
+            log_message('error', 'INPS Calculation Failed: calculateINPSForYear returned FALSE for customer_id=' . $customer_id . ', year=' . $year);
+        }
+
+        // Calculate INAIL (only for Artigiani)
+        $inail_data = $this->calculateINAILForYear($customer_id, $year);
+        if ($inail_data) {
+            $this->saveINAILCalculation($inail_data);
+            $inail_calc = $this->db->get_where('inail_calculations', array(
                 'customer_id' => $customer_id,
                 'tax_year' => $year
             ), 1)->row();
             
-            if ($inps_calc) {
-                $this->calculateAndSaveINPSPayments($customer_id, $year, $inps_calc->id);
+            if ($inail_calc) {
+                $this->calculateAndSaveINAILPayment($customer_id, $year, $inail_calc->id);
+            }
+        }
+
+        // Calculate and save Diritto Annuale payment (for Artigiani and Commercianti)
+        $customer = $this->getCustomerTaxSettings($customer_id);
+        if ($customer && in_array($customer->customer_type, array('Artigiani', 'Commercianti')) && $customer->diritto_annuale_amount > 0) {
+            $this->calculateAndSaveDirittoAnnualePayment($customer_id, $year, $customer->diritto_annuale_amount);
+        }
+
+        // Calculate Fattura Tra Privati (for all customers with pos=2 invoices >= €77.47)
+        $fattura_privati_data = $this->calculateFatturaTraPrivatiForYear($customer_id, $year);
+        if ($fattura_privati_data && $fattura_privati_data['total_invoices'] > 0) {
+            $this->saveFatturaTraPrivatiCalculation($fattura_privati_data);
+            $fattura_privati_calc = $this->db->get_where('fattura_tra_privati_calculations', array(
+                'customer_id' => $customer_id,
+                'tax_year' => $year
+            ), 1)->row();
+            
+            if ($fattura_privati_calc) {
+                $this->calculateAndSaveFatturaTraPrivatiPayment($customer_id, $year, $fattura_privati_calc->id);
             }
         }
 
         return TRUE;
     }
-}
 
+    /**
+     * Get INPS Slab by ID
+     */
+    public function getINPSSlab($id)
+    {
+        $q = $this->db->get_where('inps_rate_slabs', array('id' => $id), 1);
+        if ($q->num_rows() > 0) {
+            return $q->row();
+        }
+        return FALSE;
+    }
+
+    /**
+     * Add INPS Slab
+     */
+    public function addINPSSlab($data)
+    {
+        return $this->db->insert('inps_rate_slabs', $data);
+    }
+
+    /**
+     * Update INPS Slab
+     */
+    public function updateINPSSlab($id, $data)
+    {
+        $this->db->where('id', $id);
+        return $this->db->update('inps_rate_slabs', $data);
+    }
+
+    /**
+     * Delete INPS Slab
+     */
+    public function deleteINPSSlab($id)
+    {
+        $this->db->where('id', $id);
+        return $this->db->delete('inps_rate_slabs');
+    }
+
+    /**
+     * Get all INPS Slabs (for listing)
+     */
+    public function getAllINPSSlabs($year = NULL)
+    {
+        if ($year) {
+            $this->db->where('slab_year', $year);
+        }
+        $this->db->order_by('slab_year', 'DESC');
+        $this->db->order_by('income_from', 'ASC');
+        $q = $this->db->get('inps_rate_slabs');
+        if ($q->num_rows() > 0) {
+            return $q->result();
+        }
+        return FALSE;
+    }
+
+    /**
+     * Calculate and save Diritto Annuale payment
+     * Due date: March 31 of the same year
+     */
+    public function calculateAndSaveDirittoAnnualePayment($customer_id, $year, $amount)
+    {
+        if ($amount <= 0) {
+            return FALSE;
+        }
+
+        // Due date is March 31 of the same year
+        $due_date = $year . '-03-31';
+
+        // Check if payment already exists
+        $existing = $this->db->get_where('diritto_annuale_payments', array(
+            'customer_id' => $customer_id,
+            'payment_year' => $year
+        ), 1);
+
+        $payment_data = array(
+            'customer_id' => $customer_id,
+            'payment_year' => $year,
+            'due_date' => $due_date,
+            'amount' => $amount,
+            'paid_amount' => 0,
+            'status' => 'pending'
+        );
+
+        if ($existing->num_rows() > 0) {
+            // Update existing payment
+            $this->db->where('customer_id', $customer_id);
+            $this->db->where('payment_year', $year);
+            return $this->db->update('diritto_annuale_payments', $payment_data);
+        } else {
+            // Insert new payment
+            return $this->db->insert('diritto_annuale_payments', $payment_data);
+        }
+    }
+
+    /**
+     * Get all Diritto Annuale payments for a customer
+     */
+    public function getAllDirittoAnnualePayments($customer_id, $year = NULL)
+    {
+        $this->db->where('customer_id', $customer_id);
+        if ($year) {
+            $this->db->where('payment_year', $year);
+        }
+        $this->db->order_by('payment_year', 'DESC');
+        $this->db->order_by('due_date', 'ASC');
+        $q = $this->db->get('diritto_annuale_payments');
+        if ($q->num_rows() > 0) {
+            return $q->result();
+        }
+        return array();
+    }
+
+    /**
+     * Calculate Fattura Tra Privati for a year
+     * Counts invoices from income_data where pos=2 and sales_amount >= €77.47
+     */
+    public function calculateFatturaTraPrivatiForYear($customer_id, $year)
+    {
+        $minimum_amount = 77.47;
+        $payment_per_invoice = 2.00;
+        
+        // Get invoices from income_data where pos=2 and sales_amount >= 77.47
+        $this->db->select('COUNT(*) as total_invoices, SUM(sales_amount) as total_sales_amount');
+        $this->db->from('income_data');
+        $this->db->where('customer_id', $customer_id);
+        $this->db->where('pos', 2);
+        $this->db->where('YEAR(date_transmission)', $year);
+        $this->db->where('sales_amount >=', $minimum_amount);
+        
+        $q = $this->db->get();
+        
+        if ($q->num_rows() > 0) {
+            $result = $q->row();
+            $total_invoices = (int)$result->total_invoices;
+            $total_sales_amount = $result->total_sales_amount ? (float)$result->total_sales_amount : 0.00;
+            
+            if ($total_invoices > 0) {
+                $total_payment_amount = $total_invoices * $payment_per_invoice;
+                
+                return array(
+                    'customer_id' => $customer_id,
+                    'tax_year' => $year,
+                    'total_invoices' => $total_invoices,
+                    'total_sales_amount' => $total_sales_amount,
+                    'payment_per_invoice' => $payment_per_invoice,
+                    'total_payment_amount' => $total_payment_amount,
+                    'minimum_invoice_amount' => $minimum_amount
+                );
+            }
+        }
+        
+        return FALSE;
+    }
+
+    /**
+     * Save Fattura Tra Privati calculation
+     */
+    public function saveFatturaTraPrivatiCalculation($data)
+    {
+        // Check if calculation already exists
+        $existing = $this->db->get_where('fattura_tra_privati_calculations', array(
+            'customer_id' => $data['customer_id'],
+            'tax_year' => $data['tax_year']
+        ), 1);
+
+        if ($existing->num_rows() > 0) {
+            $this->db->where('customer_id', $data['customer_id']);
+            $this->db->where('tax_year', $data['tax_year']);
+            return $this->db->update('fattura_tra_privati_calculations', $data);
+        } else {
+            return $this->db->insert('fattura_tra_privati_calculations', $data);
+        }
+    }
+
+    /**
+     * Calculate and save Fattura Tra Privati payment
+     * Due date: February 16 of the following year
+     */
+    public function calculateAndSaveFatturaTraPrivatiPayment($customer_id, $year, $calculation_id = NULL)
+    {
+        $calculation = $this->db->get_where('fattura_tra_privati_calculations', array(
+            'customer_id' => $customer_id,
+            'tax_year' => $year
+        ), 1)->row();
+        
+        if (!$calculation || $calculation->total_payment_amount <= 0) {
+            return FALSE;
+        }
+
+        // Due date is February 16 of the following year
+        $due_date = ($year + 1) . '-02-16';
+
+        // Check if payment already exists
+        $existing = $this->db->get_where('fattura_tra_privati_payments', array(
+            'customer_id' => $customer_id,
+            'payment_year' => $year
+        ), 1);
+
+        $payment_data = array(
+            'customer_id' => $customer_id,
+            'fattura_tra_privati_calculation_id' => $calculation_id,
+            'payment_year' => $year,
+            'due_date' => $due_date,
+            'amount' => $calculation->total_payment_amount,
+            'paid_amount' => 0,
+            'status' => 'pending'
+        );
+
+        if ($existing->num_rows() > 0) {
+            // Update existing payment
+            $this->db->where('customer_id', $customer_id);
+            $this->db->where('payment_year', $year);
+            return $this->db->update('fattura_tra_privati_payments', $payment_data);
+        } else {
+            // Insert new payment
+            return $this->db->insert('fattura_tra_privati_payments', $payment_data);
+        }
+    }
+
+    /**
+     * Get Fattura Tra Privati calculation for a customer and year
+     */
+    public function getFatturaTraPrivatiCalculation($customer_id, $year)
+    {
+        $q = $this->db->get_where('fattura_tra_privati_calculations', array(
+            'customer_id' => $customer_id,
+            'tax_year' => $year
+        ), 1);
+        
+        if ($q->num_rows() > 0) {
+            return $q->row();
+        }
+        return FALSE;
+    }
+
+    /**
+     * Get all Fattura Tra Privati payments for a customer
+     */
+    public function getAllFatturaTraPrivatiPayments($customer_id, $year = NULL)
+    {
+        $this->db->where('customer_id', $customer_id);
+        if ($year) {
+            $this->db->where('payment_year', $year);
+        }
+        $this->db->order_by('payment_year', 'DESC');
+        $this->db->order_by('due_date', 'ASC');
+        $q = $this->db->get('fattura_tra_privati_payments');
+        if ($q->num_rows() > 0) {
+            return $q->result();
+        }
+        return array();
+    }
+}

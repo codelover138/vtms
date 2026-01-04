@@ -54,6 +54,9 @@ $lang['overdue']                                          = "Scaduto";
 $lang['mark_paid']                                        = "Segna come Pagato";
 $lang['enter_paid_amount']                                = "Inserisci Importo Pagato";
 $lang['enter_paid_date']                                  = "Inserisci Data Pagamento (AAAA-MM-GG)";
+$lang['mark_payment_as_paid']                             = "Segna Pagamento come Pagato";
+$lang['please_enter_valid_amount']                        = "Inserisci un importo valido";
+$lang['please_enter_paid_date']                           = "Inserisci la data di pagamento";
 $lang['payment_updated']                                  = "Pagamento aggiornato con successo";
 $lang['payment_update_failed']                           = "Impossibile aggiornare il pagamento";
 $lang['balance']                                           = "Saldo";
@@ -71,6 +74,37 @@ $lang['inps_amount_after_discount']                       = "Importo INPS Dopo S
 $lang['installment_number']                               = "Numero Rata";
 $lang['eligible_for_35_percent_inps_discount']           = "Eligibile per Sconto INPS del 35%";
 $lang['for_commercianti_artigiani_only']                  = "(Solo per Commercianti/Artigiani)";
+$lang['inps_discount_only_for_commercianti_artigiani']    = "Lo sconto INPS può essere abilitato solo per i tipi di cliente Commercianti o Artigiani";
+$lang['inps_slab_breakdown']                              = "Dettaglio Scaglioni INPS";
+$lang['start']                                            = "Inizio";
+$lang['end']                                              = "Fine";
+$lang['inps']                                             = "INPS";
+$lang['rate']                                              = "Aliquota";
+$lang['fixed']                                             = "Fisso";
+$lang['total']                                             = "Totale";
+
+// INAIL
+$lang['inail_settings']                                    = "Impostazioni INAIL";
+$lang['for_artigiani_only']                                = "(Solo per Artigiani)";
+$lang['inail_ateco_code']                                  = "Codice ATECO";
+$lang['inail_ateco_code_help']                             = "Codice ATECO per la classificazione del rischio INAIL (es. 43.32.10 per Falegname)";
+$lang['inail_rate']                                        = "Aliquota INAIL";
+$lang['inail_rate_help']                                   = "Aliquota INAIL percentuale basata sulla classe di rischio (es. 4,2 per 4,2%)";
+$lang['inail_minimum_payment']                             = "Pagamento Minimo (Annuale)";
+$lang['inail_minimum_payment_help']                        = "Importo minimo annuo INAIL (anche con reddito basso)";
+$lang['inail_calculation']                                 = "Calcolo INAIL";
+$lang['inail_payments']                                    = "Pagamenti INAIL";
+$lang['inail_coefficient']                                 = "Coefficiente INAIL";
+$lang['inail_base_amount']                                 = "Importo Base INAIL";
+$lang['inail_calculated_amount']                           = "Importo Calcolato INAIL";
+$lang['inail_final_amount']                                = "Importo Finale INAIL";
+$lang['ateco_code']                                        = "Codice ATECO";
+$lang['minimum_applied']                                   = "Minimo Applicato";
+$lang['payment_frequency']                                 = "Frequenza di Pagamento";
+$lang['one_payment_per_year']                              = "1 pagamento all'anno";
+$lang['february_16_following_year']                        = "16 febbraio dell'anno successivo";
+$lang['cannot_change_customer_type_with_existing_calculations'] = "Impossibile modificare il tipo di cliente. Questo cliente ha già calcoli fiscali. Il tipo di cliente non può essere modificato una volta che esistono calcoli.";
+$lang['customer_type_locked_existing_calculations']       = "Il tipo di cliente è bloccato perché questo cliente ha già calcoli fiscali. Non può essere modificato.";
 
 // Help Text
 $lang['coefficient_help_text']                            = "Percentuale del fatturato considerata come reddito imponibile";
@@ -101,3 +135,46 @@ $lang['invalid_request']                                  = "Richiesta non valid
 $lang['view_tax_calculations']                            = "Visualizza Calcoli Fiscali";
 $lang['no_customers_found']                                = "Nessun cliente trovato";
 
+// INPS Rate Slabs Management
+$lang['inps_rate_slabs']                                  = "Scaglioni Tasso INPS";
+$lang['inps_slab']                                        = "Scaglione INPS";
+$lang['add_inps_slab']                                    = "Aggiungi Scaglione INPS";
+$lang['edit_inps_slab']                                   = "Modifica Scaglione INPS";
+$lang['manage_inps_rate_slabs']                           = "Gestisci Scaglioni Tasso INPS";
+$lang['income_from']                                      = "Reddito Da";
+$lang['income_to']                                        = "Reddito A";
+$lang['fixed_amount']                                     = "Importo Fisso";
+$lang['is_active']                                         = "Attivo";
+$lang['all_types']                                        = "Tutti i Tipi";
+$lang['leave_empty_for_unlimited']                        = "Lascia vuoto per illimitato";
+$lang['leave_empty_for_unlimited_help']                  = "Lascia vuoto per indicare nessun limite superiore per questo scaglione";
+$lang['fixed_amount_help']                                = "Importo fisso opzionale. Se impostato, questo importo verrà utilizzato invece del calcolo percentuale per questo scaglione";
+$lang['optional']                                         = "Opzionale";
+$lang['inps_slab_added']                                  = "Scaglione INPS aggiunto con successo";
+$lang['inps_slab_add_failed']                             = "Impossibile aggiungere lo scaglione INPS";
+$lang['inps_slab_updated']                                = "Scaglione INPS aggiornato con successo";
+$lang['inps_slab_update_failed']                          = "Impossibile aggiornare lo scaglione INPS";
+$lang['inps_slab_deleted']                                = "Scaglione INPS eliminato con successo";
+$lang['inps_slab_delete_failed']                          = "Impossibile eliminare lo scaglione INPS";
+$lang['inps_slab_not_found']                              = "Scaglione INPS non trovato";
+$lang['either_inps_rate_or_fixed_amount_required']        = "È necessario fornire Tasso INPS o Importo Fisso";
+$lang['inps_rate_help_text']                               = "È necessario fornire Tasso INPS o Importo Fisso. Se entrambi sono forniti, l'Importo Fisso ha la precedenza per gli intervalli di reddito applicabili.";
+
+// Diritto Annuale
+$lang['diritto_annuale_settings']                          = "Impostazioni Diritto Annuale";
+$lang['for_artigiani_commercianti_only']                    = "(Solo per Artigiani e Commercianti)";
+$lang['diritto_annuale_amount']                            = "Importo Diritto Annuale";
+$lang['diritto_annuale_amount_help']                        = "Importo della tassa annuale per Artigiani e Commercianti. Il pagamento è dovuto il 31 marzo dello stesso anno.";
+$lang['diritto_annuale_payments']                           = "Pagamenti Diritto Annuale";
+$lang['diritto_annuale_info']                               = "Il Diritto Annuale si applica ad Artigiani e Commercianti. Il pagamento è dovuto entro il 31 marzo dello stesso anno fiscale.";
+$lang['march_31_same_year']                                 = "31 marzo dello stesso anno";
+
+// Fattura Tra Privati
+$lang['fattura_tra_privati_calculation']                    = "Calcolo Fattura Tra Privati";
+$lang['fattura_tra_privati_payments']                       = "Pagamenti Fattura Tra Privati";
+$lang['fattura_tra_privati_info']                           = "Fattura Tra Privati (Fattura tra privati): Calcolato dalle fatture con importo ≥ €77,47 da income_data dove pos=2. Il pagamento è di €2 per fattura, dovuto entro il 16 febbraio dell'anno successivo.";
+$lang['total_invoices']                                     = "Totale Fatture";
+$lang['payment_per_invoice']                                = "Pagamento Per Fattura";
+$lang['minimum_invoice_amount']                             = "Importo Minimo Fattura";
+$lang['calculation_basis']                                  = "Base di Calcolo";
+$lang['fattura_tra_privati_basis']                          = "Importo ≥ €77,47";

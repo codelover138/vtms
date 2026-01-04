@@ -54,6 +54,9 @@ $lang['overdue']                                          = "Overdue";
 $lang['mark_paid']                                        = "Mark as Paid";
 $lang['enter_paid_amount']                                = "Enter Paid Amount";
 $lang['enter_paid_date']                                  = "Enter Paid Date (YYYY-MM-DD)";
+$lang['mark_payment_as_paid']                             = "Mark Payment as Paid";
+$lang['please_enter_valid_amount']                        = "Please enter a valid amount";
+$lang['please_enter_paid_date']                           = "Please enter the paid date";
 $lang['payment_updated']                                  = "Payment updated successfully";
 $lang['payment_update_failed']                            = "Failed to update payment";
 $lang['balance']                                           = "Balance";
@@ -71,6 +74,37 @@ $lang['inps_amount_after_discount']                       = "INPS Amount After D
 $lang['installment_number']                               = "Installment Number";
 $lang['eligible_for_35_percent_inps_discount']           = "Eligible for 35% INPS Discount";
 $lang['for_commercianti_artigiani_only']                  = "(For Commercianti/Artigiani only)";
+$lang['inps_slab_breakdown']                              = "INPS Slab Breakdown";
+$lang['start']                                            = "Start";
+$lang['end']                                              = "End";
+$lang['inps']                                             = "INPS";
+$lang['rate']                                              = "Rate";
+$lang['fixed']                                             = "Fixed";
+$lang['total']                                             = "Total";
+
+// INAIL
+$lang['inail_settings']                                    = "INAIL Settings";
+$lang['for_artigiani_only']                                = "(For Artigiani only)";
+$lang['inail_ateco_code']                                  = "ATECO Code";
+$lang['inail_ateco_code_help']                             = "ATECO code for INAIL risk classification (e.g., 43.32.10 for Carpenter)";
+$lang['inail_rate']                                        = "INAIL Rate";
+$lang['inail_rate_help']                                   = "INAIL rate percentage based on risk class (e.g., 4.2 for 4.2%)";
+$lang['inail_minimum_payment']                             = "Minimum Payment (Yearly)";
+$lang['inail_minimum_payment_help']                        = "Minimum yearly INAIL payment amount (even with low income)";
+$lang['inail_calculation']                                 = "INAIL Calculation";
+$lang['inail_payments']                                    = "INAIL Payments";
+$lang['inail_coefficient']                                 = "INAIL Coefficient";
+$lang['inail_base_amount']                                 = "INAIL Base Amount";
+$lang['inail_calculated_amount']                           = "INAIL Calculated Amount";
+$lang['inail_final_amount']                                = "INAIL Final Amount";
+$lang['ateco_code']                                        = "ATECO Code";
+$lang['minimum_applied']                                   = "Minimum Applied";
+$lang['payment_frequency']                                 = "Payment Frequency";
+$lang['one_payment_per_year']                              = "1 payment per year";
+$lang['february_16_following_year']                        = "February 16 of following year";
+$lang['cannot_change_customer_type_with_existing_calculations'] = "Cannot change customer type. This customer already has tax calculations. Customer type cannot be modified once calculations exist.";
+$lang['customer_type_locked_existing_calculations']       = "Customer type is locked because this customer already has tax calculations. Cannot be changed.";
+$lang['inps_discount_only_for_commercianti_artigiani']    = "INPS discount can only be enabled for Commercianti or Artigiani customer types";
 
 // Help Text
 $lang['coefficient_help_text']                            = "Percentage of sales considered as taxable income";
@@ -107,3 +141,46 @@ $lang['tax_year']                                         = "Tax Year";
 $lang['view_tax_calculations']                            = "View Tax Calculations";
 $lang['no_customers_found']                                = "No customers found";
 
+// INPS Rate Slabs Management
+$lang['inps_rate_slabs']                                  = "INPS Rate Slabs";
+$lang['inps_slab']                                        = "INPS Slab";
+$lang['add_inps_slab']                                    = "Add INPS Slab";
+$lang['edit_inps_slab']                                   = "Edit INPS Slab";
+$lang['manage_inps_rate_slabs']                           = "Manage INPS Rate Slabs";
+$lang['income_from']                                      = "Income From";
+$lang['income_to']                                        = "Income To";
+$lang['fixed_amount']                                     = "Fixed Amount";
+$lang['is_active']                                         = "Is Active";
+$lang['all_types']                                        = "All Types";
+$lang['leave_empty_for_unlimited']                        = "Leave empty for unlimited";
+$lang['leave_empty_for_unlimited_help']                  = "Leave empty to indicate no upper limit for this slab";
+$lang['fixed_amount_help']                                = "Optional fixed amount. If set, this amount will be used instead of percentage calculation for this slab";
+$lang['optional']                                         = "Optional";
+$lang['inps_slab_added']                                  = "INPS slab added successfully";
+$lang['inps_slab_add_failed']                             = "Failed to add INPS slab";
+$lang['inps_slab_updated']                                = "INPS slab updated successfully";
+$lang['inps_slab_update_failed']                          = "Failed to update INPS slab";
+$lang['inps_slab_deleted']                                = "INPS slab deleted successfully";
+$lang['inps_slab_delete_failed']                          = "Failed to delete INPS slab";
+$lang['inps_slab_not_found']                              = "INPS slab not found";
+$lang['either_inps_rate_or_fixed_amount_required']        = "Either INPS Rate or Fixed Amount must be provided";
+$lang['inps_rate_help_text']                               = "Either INPS Rate or Fixed Amount must be provided. If both are provided, Fixed Amount takes precedence for applicable income ranges.";
+
+// Diritto Annuale
+$lang['diritto_annuale_settings']                          = "Diritto Annuale Settings";
+$lang['for_artigiani_commercianti_only']                    = "(For Artigiani and Commercianti only)";
+$lang['diritto_annuale_amount']                            = "Diritto Annuale Amount";
+$lang['diritto_annuale_amount_help']                        = "Annual fee amount for Artigiani and Commercianti. Payment is due March 31 of the same year.";
+$lang['diritto_annuale_payments']                           = "Diritto Annuale Payments";
+$lang['diritto_annuale_info']                               = "Diritto Annuale (Annual Fee) applies to Artigiani and Commercianti. Payment is due by March 31 of the same tax year.";
+$lang['march_31_same_year']                                 = "March 31 of same year";
+
+// Fattura Tra Privati
+$lang['fattura_tra_privati_calculation']                    = "Fattura Tra Privati Calculation";
+$lang['fattura_tra_privati_payments']                       = "Fattura Tra Privati Payments";
+$lang['fattura_tra_privati_info']                           = "Fattura Tra Privati (Invoice between Private Parties): Calculated from invoices with amount ≥ €77.47 from income_data where pos=2. Payment is €2 per invoice, due by February 16 of the following year.";
+$lang['total_invoices']                                     = "Total Invoices";
+$lang['payment_per_invoice']                                = "Payment Per Invoice";
+$lang['minimum_invoice_amount']                             = "Minimum Invoice Amount";
+$lang['calculation_basis']                                  = "Calculation Basis";
+$lang['fattura_tra_privati_basis']                          = "Amount ≥ €77.47";

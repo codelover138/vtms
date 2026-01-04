@@ -48,7 +48,7 @@ $(document).ready(function() {
         'fnRowCallback': function(nRow, aData, iDisplayIndex) {
             var oSettings = oTable.fnSettings();
             nRow.id = aData[0];
-            nRow.className = "transfer_link";
+            //   nRow.className = "transfer_link";
             return nRow;
         },
         "fnFooterCallback": function(nRow, aaData, iStart, iEnd, aiDisplay) {

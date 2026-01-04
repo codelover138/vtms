@@ -412,6 +412,16 @@ public function get_monthly_taxable_sales($reference_number) {
          }
          return false;
     }
+    
+    public function savePrivatiData($data=array(),$ref_no=null){
+        if($this->db->insert_batch('income_data', $data['cleaned_data']) && $this->db->insert_batch('privati_income_data', $data['insert_data'])){
+            if ($this->site->getReference('to') == $ref_no) {
+                $this->site->updateReference('to');
+                return true;
+            }
+         }
+         return false;
+    }
     public function checkDuplicateData($id_sending_list=array(),$cleaned_data=array())
     {
     $this->db->select('id_sending');

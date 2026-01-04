@@ -108,6 +108,15 @@ $(document).ready(function() {
 <div class="box">
     <div class="box-header">
         <h2 class="blue"><i class="fa-fw fa fa-calculator"></i><?= lang('tax_calculations'); ?></h2>
+        <div class="box-icon">
+            <ul class="btn-tasks">
+                <li class="dropdown">
+                    <a href="<?= admin_url('tax_calculations/inps_slabs') ?>" class="tip" title="<?= lang('manage_inps_rate_slabs') ?>">
+                        <i class="icon fa fa-list"></i> <?= lang('inps_rate_slabs') ?>
+                    </a>
+                </li>
+            </ul>
+        </div>
     </div>
     <div class="box-content">
         <div class="row">

@@ -54,3 +54,19 @@ $route['admin/sales/(:num)'] = 'admin/sales/index/$1';
 $route['admin/products/(:num)'] = 'admin/products/index/$1';
 $route['admin/purchases/(:num)'] = 'admin/purchases/index/$1';
 $route['admin/quotes/(:num)'] = 'admin/quotes/index/$1';
+
+// Tax Calculations - INPS Slabs routes (handle both hyphen and underscore versions)
+$route['admin/tax-calculations/inps-slabs'] = 'admin/tax_calculations/inps_slabs';
+$route['admin/tax-calculations/inps-slab'] = 'admin/tax_calculations/inps_slabs';
+$route['admin/tax_calculations/inps_slabs'] = 'admin/tax_calculations/inps_slabs';
+$route['admin/tax_calculations/inps_slab'] = 'admin/tax_calculations/inps_slabs';
+$route['admin/tax-calculations/get-inps-slabs'] = 'admin/tax_calculations/getINPSSlabs';
+$route['admin/tax_calculations/getINPSSlabs'] = 'admin/tax_calculations/getINPSSlabs';
+$route['admin/tax-calculations/edit-inps-slab'] = 'admin/tax_calculations/edit_inps_slab';
+$route['admin/tax-calculations/edit-inps-slab/(:any)'] = 'admin/tax_calculations/edit_inps_slab/$1';
+$route['admin/tax_calculations/edit_inps_slab'] = 'admin/tax_calculations/edit_inps_slab';
+$route['admin/tax_calculations/edit_inps_slab/(:any)'] = 'admin/tax_calculations/edit_inps_slab/$1';
+$route['admin/tax-calculations/delete-inps-slab'] = 'admin/tax_calculations/delete_inps_slab';
+$route['admin/tax-calculations/delete-inps-slab/(:any)'] = 'admin/tax_calculations/delete_inps_slab/$1';
+$route['admin/tax_calculations/delete_inps_slab'] = 'admin/tax_calculations/delete_inps_slab';
+$route['admin/tax_calculations/delete_inps_slab/(:any)'] = 'admin/tax_calculations/delete_inps_slab/$1';

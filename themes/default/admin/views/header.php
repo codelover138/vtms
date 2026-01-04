@@ -388,11 +388,11 @@
                                                             <?= lang('list_transfers'); ?></span>
                                                     </a>
                                                 </li>
-                                                <li id="transfers_transfer_by_pos">
+                                                <li id="transfer_by_fattura_privati">
                                                     <a class="submenu"
-                                                        href="<?= admin_url('transfers/transfer_by_pos'); ?>">
+                                                        href="<?= admin_url('transfers/transfer_by_fattura_privati'); ?>">
                                                         <i class="fa fa-plus-circle"></i><span class="text">
-                                                            <?= lang('Add_Transfer_By_POS'); ?></span>
+                                                            <?= lang('Add_Transfer_Fattura_Privati'); ?></span>
                                                     </a>
                                                 </li>
                                                 <li id="transfers_transfer_by_fattura">
@@ -400,6 +400,28 @@
                                                         href="<?= admin_url('transfers/transfer_by_fattura'); ?>">
                                                         <i class="fa fa-plus-circle"></i><span class="text">
                                                             <?= lang('Add_Transfer_By_Fattura'); ?></span>
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </li>
+                                        <li class="mm_tax_calculations">
+                                            <a class="dropmenu" href="#">
+                                                <i class="fa fa-star-o"></i>
+                                                <span class="text"> <?= lang('tax_calculations'); ?> </span>
+                                                <span class="chevron closed"></span>
+                                            </a>
+                                            <ul>
+                                                <li id="tax_calculations">
+                                                    <a class="submenu" href="<?= admin_url('tax_calculations'); ?>">
+                                                        <i class="fa fa-star-o"></i><span class="text">
+                                                            <?= lang('tax_calculations'); ?></span>
+                                                    </a>
+                                                </li>
+                                                <li id="tax_calculations_inps_slabs">
+                                                    <a class="submenu"
+                                                        href="<?= admin_url('tax_calculations/inps_slabs'); ?>">
+                                                        <i class="fa fa-plus-circle"></i><span class="text">
+                                                            <?= lang('inps_slabs'); ?></span>
                                                     </a>
                                                 </li>
                                             </ul>
