@@ -1,9 +1,33 @@
 <?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
 <!-- Dashboard CSS is loaded from external file: themes/default/shop/assets/css/dashboard.css -->
 
+<!-- Dashboard Loader -->
+<div class="dashboard-loader" id="dashboard-loader">
+    <div class="loader-spinner"></div>
+    <div class="loader-text"><?= lang('loading_data') ?>...</div>
+</div>
+
 <script>
 $(document).ready(function() {
+    // Hide loader when page is fully loaded
+    $(window).on('load', function() {
+        setTimeout(function() {
+            $('#dashboard-loader').addClass('hidden');
+            setTimeout(function() {
+                $('#dashboard-loader').remove();
+            }, 300);
+        }, 500);
+    });
+    
+    // Show loader when year selector changes
     $('#year-selector').change(function() {
+        // Show loader
+        if ($('#dashboard-loader').length === 0) {
+            $('body').append('<div class="dashboard-loader" id="dashboard-loader"><div class="loader-spinner"></div><div class="loader-text"><?= lang('loading_data') ?>...</div></div>');
+        } else {
+            $('#dashboard-loader').removeClass('hidden');
+        }
+        
         var year = $(this).val();
         window.location.href = '<?= site_url("dashboard") ?>?year=' + year;
     });
@@ -16,6 +40,16 @@ $(document).ready(function() {
         $(this).addClass('active');
         $('#' + target).addClass('active');
     });
+    
+    // If page is already loaded, hide loader immediately
+    if (document.readyState === 'complete') {
+        setTimeout(function() {
+            $('#dashboard-loader').addClass('hidden');
+            setTimeout(function() {
+                $('#dashboard-loader').remove();
+            }, 300);
+        }, 500);
+    }
 });
 </script>
 
