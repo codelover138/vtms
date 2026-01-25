@@ -421,6 +421,296 @@ class Tax_calculations extends MY_Controller
     }
 
     /**
+     * Edit payment details (amount, due_date, paid_amount, paid_date, status)
+     */
+    public function editPayment()
+    {
+        $this->sma->checkPermissions('edit', true);
+
+        $payment_id = $this->input->post('payment_id');
+        $payment_type = $this->input->post('payment_type');
+        $amount = $this->input->post('amount');
+        $due_date = $this->input->post('due_date');
+        $paid_amount = $this->input->post('paid_amount') ? $this->input->post('paid_amount') : 0;
+        $paid_date = $this->input->post('paid_date') ? $this->input->post('paid_date') : NULL;
+        $status = $this->input->post('status') ? $this->input->post('status') : 'pending';
+
+        if (!$payment_id || !$payment_type) {
+            $this->sma->send_json(['error' => 1, 'msg' => lang('invalid_request')]);
+        }
+
+        $table = 'tax_payments';
+        if ($payment_type == 'inps') {
+            $table = 'inps_payments';
+        } elseif ($payment_type == 'inail') {
+            $table = 'inail_payments';
+        } elseif ($payment_type == 'diritto_annuale') {
+            $table = 'diritto_annuale_payments';
+        } elseif ($payment_type == 'fattura_tra_privati') {
+            $table = 'fattura_tra_privati_payments';
+        }
+
+        $data = array(
+            'amount' => $amount,
+            'due_date' => $due_date,
+            'paid_amount' => $paid_amount,
+            'paid_date' => $paid_date,
+            'status' => $status
+        );
+
+        $this->db->where('id', $payment_id);
+        if ($this->db->update($table, $data)) {
+            $this->sma->send_json(['error' => 0, 'msg' => lang('payment_updated')]);
+        } else {
+            $this->sma->send_json(['error' => 1, 'msg' => lang('payment_update_failed')]);
+        }
+    }
+
+    /**
+     * Generate PDF for a payment
+     */
+    public function payment_pdf($payment_id = null, $payment_type = 'tax')
+    {
+        $this->sma->checkPermissions();
+
+        $redirect_url = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : admin_url('tax_calculations');
+
+        if (!$payment_id) {
+            $this->session->set_flashdata('error', lang('invalid_request'));
+            redirect($redirect_url);
+            return;
+        }
+
+        // Determine table based on payment type
+        $table = 'tax_payments';
+        if ($payment_type == 'inps') {
+            $table = 'inps_payments';
+        } elseif ($payment_type == 'inail') {
+            $table = 'inail_payments';
+        } elseif ($payment_type == 'diritto_annuale') {
+            $table = 'diritto_annuale_payments';
+        } elseif ($payment_type == 'fattura_tra_privati') {
+            $table = 'fattura_tra_privati_payments';
+        }
+
+        // Get payment details
+        $payment = $this->db->get_where($table, array('id' => $payment_id), 1)->row();
+        if (!$payment) {
+            $this->session->set_flashdata('error', lang('payment_not_found'));
+            redirect($redirect_url);
+            return;
+        }
+
+        // Get customer details
+        $customer = $this->site->getCompanyByID($payment->customer_id);
+        if (!$customer) {
+            $this->session->set_flashdata('error', lang('customer_not_found'));
+            redirect($redirect_url);
+            return;
+        }
+
+        // Get payment type name for display
+        $payment_type_name = ucfirst(str_replace('_', ' ', $payment_type));
+        if ($payment_type == 'tax' && isset($payment->payment_type)) {
+            $lang_name = lang($payment->payment_type);
+            $payment_type_name = $lang_name ? $lang_name : ucfirst(str_replace('_', ' ', $payment->payment_type));
+        } elseif ($payment_type == 'inps' && !empty($payment->notes)) {
+            $payment_type_name = $payment->notes;
+        }
+
+        // Get biller (service provider) information
+        $biller = null;
+        if (!empty($this->Settings->default_biller)) {
+            $biller = $this->site->getCompanyByID($this->Settings->default_biller);
+        }
+        // If no default biller, try to get first biller
+        if (!$biller) {
+            $this->db->where('group_name', 'biller');
+            $this->db->limit(1);
+            $biller = $this->db->get('companies')->row();
+        }
+
+        $this->data['payment'] = $payment;
+        $this->data['customer'] = $customer;
+        $this->data['biller'] = $biller;
+        $this->data['payment_type'] = $payment_type;
+        $this->data['payment_type_name'] = $payment_type_name;
+        $this->data['Settings'] = $this->Settings;
+
+        try {
+            $html = $this->load->view($this->theme . 'tax_calculations/payment_pdf', $this->data, true);
+            $name = $payment_type . '_payment_' . $payment_id . '.pdf';
+            $this->sma->generate_pdf($html, $name);
+        } catch (Exception $e) {
+            log_message('error', 'PDF Generation Error: ' . $e->getMessage());
+            $this->session->set_flashdata('error', 'PDF generation failed: ' . $e->getMessage());
+            redirect($redirect_url);
+        }
+    }
+
+    /**
+     * Generate Annual Tax Report PDF
+     */
+    public function annual_tax_report_pdf($customer_id = null, $year = null)
+    {
+        $this->sma->checkPermissions();
+
+        $redirect_url = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : admin_url('tax_calculations');
+
+        if ($this->input->get('customer_id')) {
+            $customer_id = $this->input->get('customer_id');
+        }
+        if ($this->input->get('year')) {
+            $year = $this->input->get('year');
+        }
+
+        if (!$customer_id || !$year) {
+            $this->session->set_flashdata('error', lang('invalid_request'));
+            redirect($redirect_url);
+            return;
+        }
+
+        // Get customer details
+        $customer = $this->site->getCompanyByID($customer_id);
+        if (!$customer) {
+            $this->session->set_flashdata('error', lang('customer_not_found'));
+            redirect($redirect_url);
+            return;
+        }
+
+        // Get tax calculation for the year
+        $tax_calculation = $this->tax_calculations_model->getTaxCalculation($customer_id, $year);
+        if (!$tax_calculation) {
+            $this->session->set_flashdata('error', lang('no_tax_calculation_found_for_year') . ' ' . $year);
+            redirect($redirect_url);
+            return;
+        }
+
+        // Get actual first and last transaction dates from income_data
+        $this->db->select_min('date_transmission', 'first_date');
+        $this->db->select_max('date_transmission', 'last_date');
+        $this->db->where('customer_id', $customer_id);
+        $this->db->where('YEAR(date_transmission)', $year);
+        $period_query = $this->db->get('income_data');
+        
+        // Determine period dates
+        $period_start = null;
+        $period_end = null;
+        if ($period_query->num_rows() > 0 && $period_query->row()->first_date) {
+            $first_date = new DateTime($period_query->row()->first_date);
+            $last_date = new DateTime($period_query->row()->last_date);
+            $period_start = $first_date->format('d/m/Y');
+            $period_end = $last_date->format('d/m/Y');
+        } else {
+            // If no sales data, use business start date or year boundaries
+            if ($customer->business_start_date) {
+                $start_date = new DateTime($customer->business_start_date);
+                if ($start_date->format('Y') == $year) {
+                    $period_start = $start_date->format('d/m/Y');
+                } else {
+                    $period_start = '01/01/' . $year;
+                }
+            } else {
+                $period_start = '01/01/' . $year;
+            }
+            $period_end = '31/12/' . $year;
+        }
+
+        // Calculate costs based on coefficient
+        $total_sales = $tax_calculation->total_sales;
+        $coefficient = $tax_calculation->coefficient_used;
+        $costs = $total_sales * (100 - $coefficient) / 100;
+        $net_income = $tax_calculation->taxable_income;
+
+        // Get ATECO code if available (might be stored in customer custom fields or settings)
+        $ateco_code = '';
+        if (!empty($customer->cf1)) {
+            $ateco_code = $customer->cf1;
+        } elseif (!empty($customer->cf2)) {
+            $ateco_code = $customer->cf2;
+        }
+
+        // Get PEC email if available (from cf3)
+        $pec_email = '';
+        if (!empty($customer->cf3)) {
+            $pec_email = $customer->cf3;
+        }
+
+        // Tax Number (Reg. Imp.) = customer table vat_no field
+        $tax_number = !empty($customer->vat_no) ? trim($customer->vat_no) : '';
+
+        // VAT number (P.Iva-) = customer table cf4 field (custom field 4)
+        $vat_number = !empty($customer->cf4) ? trim($customer->cf4) : '';
+
+        // Get activity description
+        $activity_description = '';
+        if (!empty($customer->cf5)) {
+            $activity_description = $customer->cf5;
+        } elseif (!empty($customer->cf6)) {
+            $activity_description = $customer->cf6;
+        }
+
+        // If no activity description, use customer type
+        if (empty($activity_description) && !empty($customer->customer_type)) {
+            // Map customer types to Italian activity descriptions
+            $activity_map = array(
+                'Gestione Separata' => 'prestazioni di servizi',
+                'Commercianti' => 'commercio',
+                'Artigiani' => 'artigianato'
+            );
+            if (isset($activity_map[$customer->customer_type])) {
+                $activity_description = $activity_map[$customer->customer_type];
+            } else {
+                $activity_description = strtolower($customer->customer_type);
+            }
+        }
+
+        $this->data['customer'] = $customer;
+        $this->data['tax_calculation'] = $tax_calculation;
+        $this->data['year'] = $year;
+        $this->data['period_start'] = $period_start;
+        $this->data['period_end'] = $period_end;
+        $this->data['total_sales'] = $total_sales;
+        $this->data['coefficient'] = $coefficient;
+        $this->data['costs'] = $costs;
+        $this->data['net_income'] = $net_income;
+        $this->data['ateco_code'] = $ateco_code;
+        $this->data['pec_email'] = $pec_email;
+        $this->data['tax_number'] = $tax_number; // Tax Number (Reg. Imp.) from vat_no
+        $this->data['vat_number'] = $vat_number; // VAT number (P.Iva-) from cf4
+        $this->data['activity_description'] = $activity_description;
+        $this->data['tax_regime'] = $customer->tax_regime ? $customer->tax_regime : 'regime_forfettario';
+        $this->data['Settings'] = $this->Settings;
+        
+        // Get current language for VAT label
+        $user_language = isset($this->Settings->user_language) ? $this->Settings->user_language : (isset($this->Settings->language) ? $this->Settings->language : 'english');
+        $this->data['user_language'] = $user_language;
+
+        // Get biller (service provider) information
+        $biller = null;
+        if (!empty($this->Settings->default_biller)) {
+            $biller = $this->site->getCompanyByID($this->Settings->default_biller);
+        }
+        if (!$biller) {
+            $this->db->where('group_name', 'biller');
+            $this->db->limit(1);
+            $biller = $this->db->get('companies')->row();
+        }
+        $this->data['biller'] = $biller;
+
+        try {
+            $html = $this->load->view($this->theme . 'tax_calculations/annual_tax_report_pdf', $this->data, true);
+            $name = 'Conto_Economico_' . $customer->name . '_' . $year . '.pdf';
+            $name = str_replace(' ', '_', $name);
+            $this->sma->generate_pdf($html, $name);
+        } catch (Exception $e) {
+            log_message('error', 'PDF Generation Error: ' . $e->getMessage());
+            $this->session->set_flashdata('error', 'PDF generation failed: ' . $e->getMessage());
+            redirect($redirect_url);
+        }
+    }
+
+    /**
      * Manage INPS Rate Slabs
      */
     public function inps_slabs()

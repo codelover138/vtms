@@ -4,7 +4,7 @@ DirectoryIndex index.php index.html
 
 RewriteEngine On
 # RewriteBase /basepath/
-RewriteCond $1 !^(index\.php|assets|install|update)
+RewriteCond $1 !^(index\.php|assets|themes|install|update)
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 

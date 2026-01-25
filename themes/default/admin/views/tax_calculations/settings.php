@@ -22,7 +22,7 @@ echo admin_form_open_multipart("tax_calculations/settings?customer_id=" . $custo
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <?= lang('customer_type', 'customer_type'); ?> <b>*</b>
+                            <?= lang('customer_type', 'customer_type'); ?>
                             <?php
                             if (isset($has_existing_calculations) && $has_existing_calculations) {
                                 // If calculations exist, show as read-only text with hidden field
@@ -49,7 +49,7 @@ echo admin_form_open_multipart("tax_calculations/settings?customer_id=" . $custo
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
-                            <?= lang('tax_regime', 'tax_regime'); ?> <b>*</b>
+                            <?= lang('tax_regime', 'tax_regime'); ?>
                             <?php
                             echo form_dropdown('tax_regime', $tax_regimes, 
                                 ($customer->tax_regime ? $customer->tax_regime : 'regime_forfettario'), 
@@ -62,7 +62,7 @@ echo admin_form_open_multipart("tax_calculations/settings?customer_id=" . $custo
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <?= lang('coefficient_of_profitability', 'coefficient_of_profitability'); ?> <b>*</b>
+                            <?= lang('coefficient_of_profitability', 'coefficient_of_profitability'); ?>
                             <div class="input-group">
                                 <?php echo form_input('coefficient_of_profitability', 
                                     ($customer->coefficient_of_profitability ? $customer->coefficient_of_profitability : '78.00'), 
@@ -75,7 +75,7 @@ echo admin_form_open_multipart("tax_calculations/settings?customer_id=" . $custo
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
-                            <?= lang('tax_rate', 'tax_rate'); ?> <b>*</b>
+                            <?= lang('tax_rate', 'tax_rate'); ?>
                             <div class="input-group">
                                 <?php echo form_input('tax_rate', 
                                     ($customer->tax_rate ? $customer->tax_rate : '5.00'), 

@@ -36,6 +36,7 @@ class Tax_calculations_model extends CI_Model
         $this->db->select_sum('taxable_sales', 'total_sales');
         $this->db->where('customer_id', $customer_id);
         $this->db->where('YEAR(date_transmission)', $year);
+        //$this->db->where('pos', 0);
         $q = $this->db->get('income_data');
         
         if ($q->num_rows() > 0) {
@@ -639,7 +640,9 @@ class Tax_calculations_model extends CI_Model
     }
 
     /**
-     * Calculate and save INPS payments (4 installments per year)
+     * Calculate and save INPS payments
+     * - For Gestione Separata: 3 payments (Saldo + 1st Acconto on June 30, 2nd Acconto on November 30)
+     * - For Commercianti/Artigiani: 4 installments per year
      */
     public function calculateAndSaveINPSPayments($customer_id, $year, $inps_calculation_id = NULL)
     {
@@ -652,51 +655,116 @@ class Tax_calculations_model extends CI_Model
             return FALSE;
         }
 
-        $total_inps = $inps_calc->inps_amount_after_discount;
-        $installment_amount = $total_inps / 4;
+        // Get customer type to determine payment structure
+        $customer = $this->getCustomerTaxSettings($customer_id);
+        $customer_type = $customer ? $customer->customer_type : NULL;
 
-        $payments = array(
-            array(
-                'customer_id' => $customer_id,
-                'inps_calculation_id' => $inps_calculation_id,
-                'installment_number' => 1,
-                'payment_year' => $year,
-                'due_date' => $year . '-05-16',
-                'amount' => $installment_amount,
-                'paid_amount' => 0,
-                'status' => 'pending'
-            ),
-            array(
-                'customer_id' => $customer_id,
-                'inps_calculation_id' => $inps_calculation_id,
-                'installment_number' => 2,
-                'payment_year' => $year,
-                'due_date' => $year . '-08-20',
-                'amount' => $installment_amount,
-                'paid_amount' => 0,
-                'status' => 'pending'
-            ),
-            array(
-                'customer_id' => $customer_id,
-                'inps_calculation_id' => $inps_calculation_id,
-                'installment_number' => 3,
-                'payment_year' => $year,
-                'due_date' => $year . '-11-16',
-                'amount' => $installment_amount,
-                'paid_amount' => 0,
-                'status' => 'pending'
-            ),
-            array(
-                'customer_id' => $customer_id,
-                'inps_calculation_id' => $inps_calculation_id,
-                'installment_number' => 4,
-                'payment_year' => $year,
-                'due_date' => ($year + 1) . '-02-16',
-                'amount' => $installment_amount,
-                'paid_amount' => 0,
-                'status' => 'pending'
-            )
-        );
+        $total_inps = $inps_calc->inps_amount_after_discount;
+        $payments = array();
+
+        if ($customer_type === 'Gestione Separata') {
+            // Gestione Separata: Same structure as tax payments
+            // Saldo (Balance): Full INPS amount for current year - due June 30 of next year
+            // 1st Acconto: 40% of INPS (50% of 80%) - due June 30 of next year
+            // 2nd Acconto: 40% of INPS (50% of 80%) - due November 30 of next year
+            
+            $acconto_base = $total_inps * 0.80; // 80% of total INPS for advances
+            $acconto_each = $acconto_base * 0.50; // 50% each (40% of total)
+
+            // Delete any existing payments for this customer/year first (to handle switching from 4 installments)
+            $this->db->where('customer_id', $customer_id);
+            $this->db->where('payment_year', $year);
+            $this->db->delete('inps_payments');
+
+            $payments = array(
+                // Saldo (Balance) for current year - due June 30 of next year
+                array(
+                    'customer_id' => $customer_id,
+                    'inps_calculation_id' => $inps_calculation_id,
+                    'installment_number' => 1, // 1 = Saldo
+                    'payment_year' => $year,
+                    'due_date' => ($year + 1) . '-06-30',
+                    'amount' => $total_inps,
+                    'paid_amount' => 0,
+                    'status' => 'pending',
+                    'notes' => 'Saldo INPS'
+                ),
+                // 1st Acconto - due June 30 of next year
+                array(
+                    'customer_id' => $customer_id,
+                    'inps_calculation_id' => $inps_calculation_id,
+                    'installment_number' => 2, // 2 = 1st Acconto
+                    'payment_year' => $year,
+                    'due_date' => ($year + 1) . '-06-30',
+                    'amount' => $acconto_each,
+                    'paid_amount' => 0,
+                    'status' => 'pending',
+                    'notes' => '1° Acconto INPS'
+                ),
+                // 2nd Acconto - due November 30 of next year
+                array(
+                    'customer_id' => $customer_id,
+                    'inps_calculation_id' => $inps_calculation_id,
+                    'installment_number' => 3, // 3 = 2nd Acconto
+                    'payment_year' => $year,
+                    'due_date' => ($year + 1) . '-11-30',
+                    'amount' => $acconto_each,
+                    'paid_amount' => 0,
+                    'status' => 'pending',
+                    'notes' => '2° Acconto INPS'
+                )
+            );
+        } else {
+            // Commercianti/Artigiani: 4 equal installments per year
+            $installment_amount = $total_inps / 4;
+
+            $payments = array(
+                array(
+                    'customer_id' => $customer_id,
+                    'inps_calculation_id' => $inps_calculation_id,
+                    'installment_number' => 1,
+                    'payment_year' => $year,
+                    'due_date' => $year . '-05-16',
+                    'amount' => $installment_amount,
+                    'paid_amount' => 0,
+                    'status' => 'pending',
+                    'notes' => '1° Rata INPS'
+                ),
+                array(
+                    'customer_id' => $customer_id,
+                    'inps_calculation_id' => $inps_calculation_id,
+                    'installment_number' => 2,
+                    'payment_year' => $year,
+                    'due_date' => $year . '-08-20',
+                    'amount' => $installment_amount,
+                    'paid_amount' => 0,
+                    'status' => 'pending',
+                    'notes' => '2° Rata INPS'
+                ),
+                array(
+                    'customer_id' => $customer_id,
+                    'inps_calculation_id' => $inps_calculation_id,
+                    'installment_number' => 3,
+                    'payment_year' => $year,
+                    'due_date' => $year . '-11-16',
+                    'amount' => $installment_amount,
+                    'paid_amount' => 0,
+                    'status' => 'pending',
+                    'notes' => '3° Rata INPS'
+                ),
+                array(
+                    'customer_id' => $customer_id,
+                    'inps_calculation_id' => $inps_calculation_id,
+                    'installment_number' => 4,
+                    'payment_year' => $year,
+                    'due_date' => ($year + 1) . '-02-16',
+                    'amount' => $installment_amount,
+                    'paid_amount' => 0,
+                    'status' => 'pending',
+                    'notes' => '4° Rata INPS'
+                )
+            );
+        }
 
         foreach ($payments as $payment) {
             $existing = $this->db->get_where('inps_payments', array(

@@ -13,15 +13,21 @@ class MY_Shop_Controller extends CI_Controller {
             $this->load->shop_model('shop_model');
             $this->load->library('Tec_cart', '', 'cart');
             $this->shop_settings = $this->shop_model->getShopSettings();
-            if($shop_language = get_cookie('shop_language', TRUE)) {
+            // Check for sma_language first (for admin language files), then shop_language
+            $selected_language = get_cookie('sma_language', TRUE);
+            if (!$selected_language) {
+                $selected_language = get_cookie('shop_language', TRUE);
+            }
+            
+            if($selected_language) {
                 // If German is selected but not available, use English
-                if ($shop_language === 'german') {
-                    $shop_language = 'english';
+                if ($selected_language === 'german') {
+                    $selected_language = 'english';
                 }
-                $this->config->set_item('language', $shop_language);
-                $this->lang->admin_load('sma', $shop_language);
-                $this->lang->shop_load('shop', $shop_language);
-                $this->Settings->user_language = $shop_language;
+                $this->config->set_item('language', $selected_language);
+                $this->lang->admin_load('sma', $selected_language);
+                $this->lang->shop_load('shop', $selected_language);
+                $this->Settings->user_language = $selected_language;
             } else {
                 $default_language = $this->Settings->language;
                 // If German is set as default but not available, use English

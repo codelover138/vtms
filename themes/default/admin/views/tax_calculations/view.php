@@ -91,6 +91,140 @@ $(document).ready(function() {
         // Make modal larger
         dialog.find('.modal-dialog').addClass('modal-lg');
     });
+
+    // Edit Payment Modal
+    $('.edit-payment').click(function(e) {
+        e.preventDefault();
+        var payment_id = $(this).data('payment-id');
+        var payment_type = $(this).data('payment-type');
+        var amount = parseFloat($(this).data('amount'));
+        var due_date = $(this).data('due-date');
+        var paid_amount = parseFloat($(this).data('paid-amount')) || 0;
+        var paid_date = $(this).data('paid-date') || '';
+        var status = $(this).data('status') || 'pending';
+
+        var modalHtml = '<form id="payment-edit-form" class="form-horizontal">' +
+            '<div class="form-group">' +
+            '<label for="edit_amount" class="col-sm-4 control-label"><?= lang('amount') ?> *</label>' +
+            '<div class="col-sm-8">' +
+            '<div class="input-group">' +
+            '<span class="input-group-addon">€</span>' +
+            '<input type="number" class="form-control" id="edit_amount" name="amount" step="0.01" min="0" value="' + amount + '" required>' +
+            '</div>' +
+            '</div>' +
+            '</div>' +
+            '<div class="form-group">' +
+            '<label for="edit_due_date" class="col-sm-4 control-label"><?= lang('due_date') ?> *</label>' +
+            '<div class="col-sm-8">' +
+            '<input type="date" class="form-control" id="edit_due_date" name="due_date" value="' + due_date + '" required>' +
+            '</div>' +
+            '</div>' +
+            '<div class="form-group">' +
+            '<label for="edit_paid_amount" class="col-sm-4 control-label"><?= lang('paid_amount') ?></label>' +
+            '<div class="col-sm-8">' +
+            '<div class="input-group">' +
+            '<span class="input-group-addon">€</span>' +
+            '<input type="number" class="form-control" id="edit_paid_amount" name="paid_amount" step="0.01" min="0" value="' + paid_amount + '">' +
+            '</div>' +
+            '</div>' +
+            '</div>' +
+            '<div class="form-group">' +
+            '<label for="edit_paid_date" class="col-sm-4 control-label"><?= lang('paid_date') ?></label>' +
+            '<div class="col-sm-8">' +
+            '<input type="date" class="form-control" id="edit_paid_date" name="paid_date" value="' + paid_date + '">' +
+            '</div>' +
+            '</div>' +
+            '<div class="form-group">' +
+            '<label for="edit_status" class="col-sm-4 control-label"><?= lang('status') ?> *</label>' +
+            '<div class="col-sm-8">' +
+            '<select class="form-control" id="edit_status" name="status" required>' +
+            '<option value="pending"' + (status == 'pending' ? ' selected' : '') + '><?= lang('pending') ?></option>' +
+            '<option value="paid"' + (status == 'paid' ? ' selected' : '') + '><?= lang('paid') ?></option>' +
+            '<option value="overdue"' + (status == 'overdue' ? ' selected' : '') + '><?= lang('overdue') ?></option>' +
+            '</select>' +
+            '</div>' +
+            '</div>' +
+            '</form>';
+
+        var dialog = bootbox.dialog({
+            title: "<?= lang('edit_payment') ?>",
+            message: modalHtml,
+            buttons: {
+                cancel: {
+                    label: "<?= lang('cancel') ?>",
+                    className: "btn-default"
+                },
+                confirm: {
+                    label: "<?= lang('save') ?>",
+                    className: "btn-primary",
+                    callback: function() {
+                        var edit_amount = $('#edit_amount').val();
+                        var edit_due_date = $('#edit_due_date').val();
+                        var edit_paid_amount = $('#edit_paid_amount').val() || 0;
+                        var edit_paid_date = $('#edit_paid_date').val() || null;
+                        var edit_status = $('#edit_status').val();
+
+                        if (!edit_amount || edit_amount <= 0) {
+                            bootbox.alert("<?= lang('please_enter_valid_amount') ?>");
+                            return false;
+                        }
+
+                        if (!edit_due_date) {
+                            bootbox.alert("<?= lang('please_enter_due_date') ?>");
+                            return false;
+                        }
+
+                        $.ajax({
+                            type: 'POST',
+                            url: '<?= admin_url('tax_calculations/editPayment') ?>',
+                            data: {
+                                <?= $this->security->get_csrf_token_name() ?>: '<?= $this->security->get_csrf_hash() ?>',
+                                payment_id: payment_id,
+                                payment_type: payment_type,
+                                amount: edit_amount,
+                                due_date: edit_due_date,
+                                paid_amount: edit_paid_amount,
+                                paid_date: edit_paid_date,
+                                status: edit_status
+                            },
+                            dataType: 'json',
+                            success: function(data) {
+                                if (data.error == 0) {
+                                    location.reload();
+                                } else {
+                                    bootbox.alert(data.msg);
+                                }
+                            },
+                            error: function(xhr, status, error) {
+                                bootbox.alert('Error: ' + error);
+                            }
+                        });
+
+                        return false;
+                    }
+                }
+            }
+        });
+
+        dialog.find('.modal-dialog').addClass('modal-lg');
+    });
+
+    // PDF Download without opening new tab
+    $('.download-pdf').click(function(e) {
+        e.preventDefault();
+        var url = $(this).data('url');
+        
+        // Create a hidden iframe to trigger download
+        var iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = url;
+        document.body.appendChild(iframe);
+        
+        // Remove iframe after download starts
+        setTimeout(function() {
+            document.body.removeChild(iframe);
+        }, 5000);
+    });
 });
 </script>
 <div class="box">
@@ -122,6 +256,12 @@ $(document).ready(function() {
                         class="btn btn-warning">
                         <i class="fa fa-cog"></i> <?= lang('tax_settings') ?>
                     </a>
+                    <?php if ($tax_calculation): ?>
+                    <a href="#" class="btn btn-success download-pdf"
+                        data-url="<?= admin_url('tax_calculations/annual_tax_report_pdf?customer_id=' . $customer->id . '&year=' . $year) ?>">
+                        <i class="fa fa-file-pdf-o"></i> <?= lang('annual_tax_report_pdf') ?>
+                    </a>
+                    <?php endif; ?>
                     <a href="<?= admin_url('tax_calculations') ?>" class="btn btn-default">
                         <i class="fa fa-arrow-left"></i> <?= lang('back_to_list') ?>
                     </a>
@@ -136,6 +276,13 @@ $(document).ready(function() {
                                 <?= lang('tax_calculation') ?> - <?= lang('year') ?>: <?= $year ?>
                                 <small class="text-muted">(<?= lang('calculated_in_year') ?> <?= $year + 1 ?>)</small>
                             </h3>
+                            <div class="pull-right" style="margin-top: -25px;">
+                                <a href="#" class="btn btn-sm btn-success download-pdf"
+                                    data-url="<?= admin_url('tax_calculations/annual_tax_report_pdf?customer_id=' . $customer->id . '&year=' . $year) ?>"
+                                    title="<?= lang('download_conto_economico_pdf') ?>">
+                                    <i class="fa fa-file-pdf-o"></i> <?= lang('annual_tax_report_pdf') ?>
+                                </a>
+                            </div>
                         </div>
                         <div class="panel-body">
                             <div class="row">
@@ -249,6 +396,20 @@ $(document).ready(function() {
                                                     <i class="fa fa-check"></i> <?= lang('mark_paid') ?>
                                                 </a>
                                                 <?php endif; ?>
+                                                <a href="#" class="btn btn-xs btn-primary edit-payment"
+                                                    data-payment-id="<?= $payment->id ?>" 
+                                                    data-payment-type="tax"
+                                                    data-amount="<?= $payment->amount ?>"
+                                                    data-due-date="<?= $payment->due_date ?>"
+                                                    data-paid-amount="<?= $payment->paid_amount ?>"
+                                                    data-paid-date="<?= $payment->paid_date ?>"
+                                                    data-status="<?= $payment->status ?>">
+                                                    <i class="fa fa-edit"></i> <?= lang('edit') ?>
+                                                </a>
+                                                <a href="#" class="btn btn-xs btn-danger download-pdf"
+                                                    data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/tax') ?>">
+                                                    <i class="fa fa-file-pdf-o"></i> PDF
+                                                </a>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -391,7 +552,7 @@ $(document).ready(function() {
                                 <table class="table table-bordered table-striped">
                                     <thead>
                                         <tr>
-                                            <th><?= lang('installment_number'); ?></th>
+                                            <th><?= lang('payment_type'); ?></th>
                                             <th><?= lang('due_date'); ?></th>
                                             <th><?= lang('amount'); ?></th>
                                             <th><?= lang('paid_amount'); ?></th>
@@ -403,7 +564,7 @@ $(document).ready(function() {
                                     <tbody>
                                         <?php foreach ($inps_payments as $payment): ?>
                                         <tr>
-                                            <td><?= $payment->installment_number; ?></td>
+                                            <td><?= !empty($payment->notes) ? $payment->notes : $payment->installment_number . '° Rata'; ?></td>
                                             <td><?= $this->sma->hrsd($payment->due_date); ?></td>
                                             <td><?= $this->sma->formatMoney($payment->amount); ?></td>
                                             <td><?= $this->sma->formatMoney($payment->paid_amount); ?></td>
@@ -428,6 +589,20 @@ $(document).ready(function() {
                                                     <i class="fa fa-check"></i> <?= lang('mark_paid') ?>
                                                 </a>
                                                 <?php endif; ?>
+                                                <a href="#" class="btn btn-xs btn-primary edit-payment"
+                                                    data-payment-id="<?= $payment->id ?>" 
+                                                    data-payment-type="inps"
+                                                    data-amount="<?= $payment->amount ?>"
+                                                    data-due-date="<?= $payment->due_date ?>"
+                                                    data-paid-amount="<?= $payment->paid_amount ?>"
+                                                    data-paid-date="<?= $payment->paid_date ?>"
+                                                    data-status="<?= $payment->status ?>">
+                                                    <i class="fa fa-edit"></i> <?= lang('edit') ?>
+                                                </a>
+                                                <a href="#" class="btn btn-xs btn-danger download-pdf"
+                                                    data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/inps') ?>">
+                                                    <i class="fa fa-file-pdf-o"></i> PDF
+                                                </a>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -560,6 +735,20 @@ $(document).ready(function() {
                                                     <i class="fa fa-check"></i> <?= lang('mark_paid') ?>
                                                 </a>
                                                 <?php endif; ?>
+                                                <a href="#" class="btn btn-xs btn-primary edit-payment"
+                                                    data-payment-id="<?= $payment->id ?>" 
+                                                    data-payment-type="inail"
+                                                    data-amount="<?= $payment->amount ?>"
+                                                    data-due-date="<?= $payment->due_date ?>"
+                                                    data-paid-amount="<?= $payment->paid_amount ?>"
+                                                    data-paid-date="<?= $payment->paid_date ?>"
+                                                    data-status="<?= $payment->status ?>">
+                                                    <i class="fa fa-edit"></i> <?= lang('edit') ?>
+                                                </a>
+                                                <a href="#" class="btn btn-xs btn-danger download-pdf"
+                                                    data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/inail') ?>">
+                                                    <i class="fa fa-file-pdf-o"></i> PDF
+                                                </a>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -623,6 +812,20 @@ $(document).ready(function() {
                                                     <i class="fa fa-check"></i> <?= lang('mark_paid') ?>
                                                 </a>
                                                 <?php endif; ?>
+                                                <a href="#" class="btn btn-xs btn-primary edit-payment"
+                                                    data-payment-id="<?= $payment->id ?>" 
+                                                    data-payment-type="diritto_annuale"
+                                                    data-amount="<?= $payment->amount ?>"
+                                                    data-due-date="<?= $payment->due_date ?>"
+                                                    data-paid-amount="<?= $payment->paid_amount ?>"
+                                                    data-paid-date="<?= $payment->paid_date ?>"
+                                                    data-status="<?= $payment->status ?>">
+                                                    <i class="fa fa-edit"></i> <?= lang('edit') ?>
+                                                </a>
+                                                <a href="#" class="btn btn-xs btn-danger download-pdf"
+                                                    data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/diritto_annuale') ?>">
+                                                    <i class="fa fa-file-pdf-o"></i> PDF
+                                                </a>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -747,6 +950,20 @@ $(document).ready(function() {
                                                     <i class="fa fa-check"></i> <?= lang('mark_paid') ?>
                                                 </a>
                                                 <?php endif; ?>
+                                                <a href="#" class="btn btn-xs btn-primary edit-payment"
+                                                    data-payment-id="<?= $payment->id ?>" 
+                                                    data-payment-type="fattura_tra_privati"
+                                                    data-amount="<?= $payment->amount ?>"
+                                                    data-due-date="<?= $payment->due_date ?>"
+                                                    data-paid-amount="<?= $payment->paid_amount ?>"
+                                                    data-paid-date="<?= $payment->paid_date ?>"
+                                                    data-status="<?= $payment->status ?>">
+                                                    <i class="fa fa-edit"></i> <?= lang('edit') ?>
+                                                </a>
+                                                <a href="#" class="btn btn-xs btn-danger download-pdf"
+                                                    data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/fattura_tra_privati') ?>">
+                                                    <i class="fa fa-file-pdf-o"></i> PDF
+                                                </a>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>

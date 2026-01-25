@@ -232,3 +232,30 @@ $lang['nov']                                               = "Nov";
 $lang['dec']                                               = "Dec";
 $lang['overdue_payments']                                  = "Overdue Payments";
 $lang['paid_payments']                                     = "Paid Payments";
+
+// Language Selection
+$lang['language']                                           = "Language";
+$lang['english']                                            = "English";
+$lang['italian']                                            = "Italian";
+$lang['loading_data']                                       = "Loading data";
+
+// Annual Tax Report PDF
+$lang['annual_tax_report_pdf']                             = "Annual Tax Report PDF";
+$lang['conto_economico']                                   = "Economic Account";
+$lang['situazione_economica']                              = "Economic Situation";
+$lang['valore_della_produzione']                           = "Value of Production";
+$lang['ricavi_delle_prestazioni']                          = "Revenues from Services";
+$lang['totale_valore_della_produzione']                    = "Total Value of Production";
+$lang['costi_della_produzione']                            = "Costs of Production";
+$lang['totale_costi_della_produzione']                     = "Total Costs of Production";
+$lang['reddito_netto']                                     = "Net Income";
+$lang['titolare']                                          = "Owner";
+$lang['reg_imp']                                           = "Reg. Imp.";
+$lang['p_iva']                                             = "P.IVA";
+$lang['p_iva_italian']                                     = "P.Iva-";
+$lang['contribuente_in_regime_forfettario']                = "Contribuente in regime forfettario";
+$lang['attivita_di']                                       = "attività di";
+$lang['based_on_ateco_code']                               = "In base al codice ateco";
+$lang['based_on_profitability']                            = "In base alla redditività";
+$lang['redditivita']                                       = "redditività";
+$lang['download_conto_economico_pdf']                      = "Download Conto Economico PDF";

@@ -118,8 +118,10 @@ $(document).ready(function() {
     
     // Handle calculate button click
     $(document).on('click', '.calculate-tax-btn', function(e) {
+        console.log($(this).data('customer-id'));
         e.preventDefault();
         e.stopPropagation();
+        console.log($(this).data('customer-id'));
         var customer_id = $(this).data('customer-id');
         // Find the year input in the same dropdown menu
         var year_input = $(this).closest('.dropdown-menu').find('.year-input');

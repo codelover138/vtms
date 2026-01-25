@@ -17,8 +17,15 @@ class Main extends MY_Shop_Controller
         if (!SHOP) { redirect('admin'); }
         if ($this->shop_settings->private && !$this->loggedIn) { redirect('/login'); }
         // Redirect customer users to dashboard
+        // Only redirect if we're not already on dashboard route
         if ($this->loggedIn && $this->Customer) {
-            redirect('dashboard');
+            // Check current URI to avoid redirect loops
+            $current_uri = $this->uri->uri_string();
+            if ($current_uri != 'dashboard' && $current_uri != 'main/dashboard' && empty($current_uri)) {
+                // Use site_url to ensure direct routing
+                redirect(site_url('dashboard'));
+                return;
+            }
         }
         $this->data['featured_products'] = $this->shop_model->getFeaturedProducts();
         $this->data['slider'] = json_decode($this->shop_settings->slider);
@@ -30,16 +37,33 @@ class Main extends MY_Shop_Controller
     function dashboard() {
         if (!$this->loggedIn) { 
             $this->session->set_userdata('requested_page', 'dashboard');
-            redirect('/login'); 
+            redirect('login'); 
+            return;
         }
-        if ($this->Staff) { redirect('admin/welcome'); }
-        if (!$this->Customer) { redirect('/'); }
+        if ($this->Staff) { 
+            redirect('admin/welcome'); 
+            return;
+        }
+        if (!$this->Customer) { 
+            redirect('/'); 
+            return;
+        }
 
         // Load tax calculations model and language
         $this->load->admin_model('tax_calculations_model');
-        $user_language = isset($this->Settings->user_language) ? $this->Settings->user_language : (isset($this->Settings->language) ? $this->Settings->language : 'english');
+        
+        // Get current language - check cookies first, then Settings
+        $cookie_lang = $this->input->cookie('sma_language', TRUE);
+        if (!$cookie_lang) {
+            $cookie_lang = $this->input->cookie('shop_language', TRUE);
+        }
+        $user_language = $cookie_lang ? $cookie_lang : (isset($this->Settings->user_language) ? $this->Settings->user_language : (isset($this->Settings->language) ? $this->Settings->language : 'english'));
+        
         $this->lang->admin_load('sma', $user_language);
         $this->lang->admin_load('tax_calculations', $user_language);
+        
+        // Pass current language to view
+        $this->data['current_language'] = $user_language;
         
         // If SHOP is not enabled, we need to set up basic shop settings
         if (!SHOP) {
@@ -81,6 +105,32 @@ class Main extends MY_Shop_Controller
         // Get tax calculation for selected year
         $this->data['tax_calculation'] = $this->tax_calculations_model->getTaxCalculation($customer_id, $tax_year);
         $this->data['latest_tax_calculation'] = $this->data['tax_calculation'] ? $this->data['tax_calculation'] : $latest_calculation;
+        
+        // If no tax calculation exists for the selected year, get live sales data
+        $this->data['live_sales_data'] = null;
+        if (!$this->data['tax_calculation']) {
+            // Get customer settings for coefficient
+            $customer_settings = $this->tax_calculations_model->getCustomerTaxSettings($customer_id);
+            $coefficient = $customer_settings && $customer_settings->coefficient_of_profitability 
+                ? $customer_settings->coefficient_of_profitability : 78.00;
+            $tax_rate = $customer_settings && $customer_settings->tax_rate 
+                ? $customer_settings->tax_rate : 5.00;
+            
+            // Get live sales data for selected year
+            $total_sales = $this->tax_calculations_model->getTotalSalesForYear($customer_id, $tax_year);
+            $taxable_income = $total_sales * $coefficient / 100;
+            $estimated_tax = $taxable_income * $tax_rate / 100;
+            
+            $this->data['live_sales_data'] = (object) array(
+                'tax_year' => $tax_year,
+                'total_sales' => $total_sales,
+                'taxable_income' => $taxable_income,
+                'coefficient_used' => $coefficient,
+                'tax_rate' => $tax_rate,
+                'estimated_tax' => $estimated_tax,
+                'is_live' => true
+            );
+        }
         
         // Get all tax payments for the selected year
         $this->data['tax_payments'] = $this->tax_calculations_model->getAllTaxPayments($customer_id, $tax_year);
@@ -611,13 +661,61 @@ class Main extends MY_Shop_Controller
         echo true;
     }
 
-    function language($lang) {
-        $folder = 'app/language/';
-        $languagefiles = scandir($folder);
-        if (in_array($lang, $languagefiles)) {
-            set_cookie('shop_language', $lang, 31536000);
+    function language($lang = NULL) {
+        // Get language from URL parameter if not provided
+        if (!$lang) {
+            $lang = $this->uri->segment(2);
         }
-        redirect($_SERVER["HTTP_REFERER"]);
+        
+        // Validate language
+        $available_languages = array('english', 'italian');
+        
+        if (!$lang || !in_array($lang, $available_languages)) {
+            if ($this->input->is_ajax_request()) {
+                $this->sma->send_json(['error' => 1, 'msg' => 'Invalid language selected']);
+            } else {
+                $this->session->set_flashdata('error', 'Invalid language selected');
+                redirect('dashboard');
+            }
+            return;
+        }
+        
+        // Set both shop_language and sma_language cookies for compatibility
+        // sma_language is used by admin language files (tax_calculations)
+        // Cookies must be set before any output or redirect
+        // Use explicit cookie parameters to ensure they're set correctly
+        $cookie_expire = time() + 31536000; // 1 year
+        $cookie_path = '/';
+        $cookie_domain = '';
+        
+        // Set cookies using setcookie directly to ensure they're set
+        setcookie('shop_language', $lang, $cookie_expire, $cookie_path, $cookie_domain);
+        setcookie('sma_language', $lang, $cookie_expire, $cookie_path, $cookie_domain);
+        
+        // Also use CodeIgniter's set_cookie for compatibility
+        set_cookie('shop_language', $lang, 31536000);
+        set_cookie('sma_language', $lang, 31536000);
+        
+        // If AJAX request, just return success
+        if ($this->input->is_ajax_request()) {
+            $this->sma->send_json(['error' => 0, 'msg' => 'Language changed successfully']);
+            return;
+        }
+        
+        // Get year parameter from GET to preserve it
+        $year = $this->input->get('year');
+        
+        // Build redirect URL using site_url to ensure proper absolute URL
+        // This prevents redirect loops by going directly to dashboard route
+        $redirect_url = site_url('dashboard');
+        if ($year) {
+            $redirect_url .= '?year=' . urlencode($year);
+        }
+        
+        // Use direct header redirect to bypass any potential redirect loops
+        // This ensures we go directly to dashboard without going through index()
+        header('Location: ' . $redirect_url, TRUE, 302);
+        exit;
     }
 
     function currency($currency) {

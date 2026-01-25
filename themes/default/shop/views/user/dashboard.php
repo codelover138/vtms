@@ -19,6 +19,32 @@ $(document).ready(function() {
         }, 500);
     });
     
+    // Language selector change
+    $('#language-selector').change(function() {
+        var lang = $(this).val();
+        var currentYear = $('#year-selector').val() || '';
+        
+        // Show loader
+        if ($('#dashboard-loader').length === 0) {
+            $('body').append('<div class="dashboard-loader" id="dashboard-loader"><div class="loader-spinner"></div><div class="loader-text"><?= lang('loading_data') ?>...</div></div>');
+        } else {
+            $('#dashboard-loader').removeClass('hidden');
+        }
+        
+        // Build redirect URL - use site_url for proper routing
+        var url = '<?= site_url("language") ?>/' + lang;
+        if (currentYear) {
+            url += '?year=' + encodeURIComponent(currentYear);
+        }
+        
+        // Debug: log the URL (can be removed in production)
+        console.log('Changing language to:', lang);
+        console.log('Redirect URL:', url);
+        
+        // Use window.location.href to navigate
+        window.location.href = url;
+    });
+    
     // Show loader when year selector changes
     $('#year-selector').change(function() {
         // Show loader
@@ -97,10 +123,35 @@ $(document).ready(function() {
         </div>
     </div>
 
-    <!-- Year Selector -->
-    <div class="year-selector-container">
-        <label for="year-selector"><i class="fa fa-calendar"></i> <?= lang('select_year') ?>:</label>
-        <select id="year-selector" name="year">
+    <!-- Language and Year Selectors -->
+    <div class="year-selector-container" style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+        <!-- Language Selector -->
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <label for="language-selector"><i class="fa fa-language"></i> <?= lang('language') ?>:</label>
+            <select id="language-selector" name="language" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                <?php 
+                // Get current language from controller data, fallback to Settings
+                $current_lang = isset($current_language) ? $current_language : (isset($Settings->user_language) ? $Settings->user_language : (isset($Settings->language) ? $Settings->language : 'english'));
+                
+                // Map language codes to display names
+                $lang_names = array(
+                    'english' => lang('english'),
+                    'italian' => lang('italian')
+                );
+                
+                foreach (array('english', 'italian') as $lang_code):
+                    $selected = ($current_lang == $lang_code) ? 'selected' : '';
+                    $lang_display = isset($lang_names[$lang_code]) ? $lang_names[$lang_code] : ucfirst($lang_code);
+                ?>
+                <option value="<?= $lang_code ?>" <?= $selected ?>><?= $lang_display ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        
+        <!-- Year Selector -->
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <label for="year-selector"><i class="fa fa-calendar"></i> <?= lang('select_year') ?>:</label>
+            <select id="year-selector" name="year">
             <?php 
             $available_years = array();
             foreach ($tax_calculations as $calc) {
@@ -115,7 +166,8 @@ $(document).ready(function() {
             ?>
             <option value="<?= $y ?>" <?= $tax_year == $y ? 'selected' : '' ?>><?= $y ?></option>
             <?php endfor; ?>
-        </select>
+            </select>
+        </div>
     </div>
 
     <!-- Income Prediction Card -->
@@ -247,7 +299,9 @@ $(document).ready(function() {
         <!-- Tax Calculation Tab -->
         <div id="tab-tax" class="tab-content active">
             <?php 
-            $display_calc = isset($tax_calculation) && $tax_calculation ? $tax_calculation : (isset($latest_tax_calculation) && $latest_tax_calculation ? $latest_tax_calculation : null);
+            $display_calc = isset($tax_calculation) && $tax_calculation ? $tax_calculation : null;
+            $show_live = isset($live_sales_data) && $live_sales_data && $live_sales_data->total_sales > 0;
+            
             if ($display_calc): 
             ?>
             <div class="info-grid">
@@ -285,6 +339,41 @@ $(document).ready(function() {
                     <div class="info-card-value"><?= $this->sma->formatMoney($display_calc->previous_year_inps) ?></div>
                 </div>
                 <?php endif; ?>
+            </div>
+            <?php elseif ($show_live): ?>
+            <!-- Live Sales Data (Tax not yet calculated) -->
+            <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%); border-left: 4px solid #ffc107; padding: 15px 20px; margin-bottom: 20px; border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fa fa-info-circle" style="color: #856404; font-size: 18px;"></i>
+                    <div>
+                        <strong style="color: #856404;"><?= lang('live_data') ? lang('live_data') : 'Live Data' ?> - <?= $tax_year ?></strong>
+                        <p style="margin: 5px 0 0 0; color: #856404; font-size: 12px;">
+                            <?= lang('tax_not_calculated_yet') ? lang('tax_not_calculated_yet') : 'Tax calculation has not been run yet for this year. Below is your current sales data.' ?>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="info-grid">
+                <div class="info-card">
+                    <div class="info-card-label"><?= lang('total_sales') ?> <span style="color: #28a745; font-size: 10px;">(<?= lang('live') ? lang('live') : 'LIVE' ?>)</span></div>
+                    <div class="info-card-value"><?= $this->sma->formatMoney($live_sales_data->total_sales) ?></div>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-label"><?= lang('taxable_income') ?> <span style="color: #17a2b8; font-size: 10px;">(<?= lang('estimated') ? lang('estimated') : 'EST' ?>)</span></div>
+                    <div class="info-card-value highlight"><?= $this->sma->formatMoney($live_sales_data->taxable_income) ?></div>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-label"><?= lang('estimated_tax') ? lang('estimated_tax') : 'Estimated Tax' ?></div>
+                    <div class="info-card-value highlight"><?= $this->sma->formatMoney($live_sales_data->estimated_tax) ?></div>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-label"><?= lang('coefficient_used') ?></div>
+                    <div class="info-card-value"><?= number_format($live_sales_data->coefficient_used, 2) ?>%</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-label"><?= lang('tax_rate') ?></div>
+                    <div class="info-card-value"><?= number_format($live_sales_data->tax_rate, 2) ?>%</div>
+                </div>
             </div>
             <?php else: ?>
             <div class="empty-state">

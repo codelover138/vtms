@@ -4,18 +4,19 @@
 
 <head>
     <meta charset="utf-8">
-    <base href="<?= site_url() ?>" />
+    <!-- Removed base tag to prevent stylesheet redirect issues -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= isset($page_title) ? $page_title : $shop_settings->shop_name ?> - <?= $Settings->site_name ?></title>
     <?php 
     // Use admin assets as shop assets may not exist
+    // Use absolute URLs with base_url to prevent redirect issues
     $admin_assets = base_url('themes/default/admin/assets/');
     ?>
     <link rel="shortcut icon" href="<?= $admin_assets ?>images/icon.png" />
-    <link href="<?= $admin_assets ?>styles/bootstrap.min.css" rel="stylesheet" />
-    <link href="<?= $admin_assets ?>styles/style.css" rel="stylesheet" />
-    <link href="<?= $admin_assets ?>styles/theme.css" rel="stylesheet" />
-    <link href="<?= $admin_assets ?>fonts/fontawesome-webfont.css" rel="stylesheet" />
+    <link href="<?= $admin_assets ?>styles/helpers/bootstrap.min.css" rel="stylesheet" type="text/css" />
+    <link href="<?= $admin_assets ?>styles/style.css" rel="stylesheet" type="text/css" />
+    <link href="<?= $admin_assets ?>styles/theme.css" rel="stylesheet" type="text/css" />
+    <link href="<?= $admin_assets ?>styles/helpers/font-awesome.min.css" rel="stylesheet" type="text/css" />
     <?php 
     // Load dashboard CSS if on dashboard page
     $is_dashboard = (isset($page_title) && stripos($page_title, 'dashboard') !== false) || 
@@ -23,7 +24,7 @@
                     (isset($_SERVER['REQUEST_URI']) && stripos($_SERVER['REQUEST_URI'], 'dashboard') !== false);
     if ($is_dashboard): 
     ?>
-    <link href="<?= base_url('themes/default/shop/assets/css/dashboard.css') ?>" rel="stylesheet" />
+    <link href="<?= rtrim(base_url(), '/') . '/themes/default/shop/assets/css/dashboard.css' ?>" rel="stylesheet" type="text/css" />
     <?php endif; ?>
     <script type="text/javascript" src="<?= $admin_assets ?>js/jquery-2.0.3.min.js"></script>
     <script type="text/javascript" src="<?= $admin_assets ?>js/jquery-migrate-1.2.1.min.js"></script>
