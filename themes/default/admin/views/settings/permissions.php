@@ -167,6 +167,77 @@
                                     </td>
                                 </tr>
                                 <tr>
+                                    <td><?= lang("transfers"); ?></td>
+                                    <td class="text-center">
+                                        <input type="checkbox" value="1" class="checkbox" name="transfers-index" <?php echo (isset($p->{'transfers-index'}) && $p->{'transfers-index'}) ? "checked" : ''; ?>>
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="checkbox" value="1" class="checkbox" name="transfers-add" <?php echo (isset($p->{'transfers-add'}) && $p->{'transfers-add'}) ? "checked" : ''; ?>>
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="checkbox" value="1" class="checkbox" name="transfers-edit" <?php echo (isset($p->{'transfers-edit'}) && $p->{'transfers-edit'}) ? "checked" : ''; ?>>
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="checkbox" value="1" class="checkbox" name="transfers-delete" <?php echo (isset($p->{'transfers-delete'}) && $p->{'transfers-delete'}) ? "checked" : ''; ?>>
+                                    </td>
+                                    <td>
+                                        <span style="display:inline-block;">
+                                            <input type="checkbox" value="1" id="transfers-csv" class="checkbox" name="transfers-csv" <?php echo (isset($p->{'transfers-csv'}) && $p->{'transfers-csv'}) ? "checked" : ''; ?>>
+                                            <label for="transfers-csv" class="padding05"><?= lang('add_transfer_by_csv') ?></label>
+                                        </span>
+                                        <span style="display:inline-block;">
+                                            <input type="checkbox" value="1" id="transfers-transfer_by_fattura" class="checkbox" name="transfers-transfer_by_fattura" <?php echo (isset($p->{'transfers-transfer_by_fattura'}) && $p->{'transfers-transfer_by_fattura'}) ? "checked" : ''; ?>>
+                                            <label for="transfers-transfer_by_fattura" class="padding05"><?= lang('Add_Transfer_By_Fattura') ?></label>
+                                        </span>
+                                        <span style="display:inline-block;">
+                                            <input type="checkbox" value="1" id="transfers-transfer_by_fattura_privati" class="checkbox" name="transfers-transfer_by_fattura_privati" <?php echo (isset($p->{'transfers-transfer_by_fattura_privati'}) && $p->{'transfers-transfer_by_fattura_privati'}) ? "checked" : ''; ?>>
+                                            <label for="transfers-transfer_by_fattura_privati" class="padding05"><?= lang('Add_Transfer_By_Fattura_Privati') ?></label>
+                                        </span>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td><?= lang("tax_calculations"); ?></td>
+                                    <td class="text-center">
+                                        <input type="checkbox" value="1" class="checkbox" name="tax_calculations-index" <?php echo (isset($p->{'tax_calculations-index'}) && $p->{'tax_calculations-index'}) ? "checked" : ''; ?>>
+                                    </td>
+                                    <td class="text-center">
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="checkbox" value="1" class="checkbox" name="tax_calculations-edit" <?php echo (isset($p->{'tax_calculations-edit'}) && $p->{'tax_calculations-edit'}) ? "checked" : ''; ?>>
+                                    </td>
+                                    <td class="text-center">
+                                    </td>
+                                    <td>
+                                        <span style="display:inline-block;">
+                                            <input type="checkbox" value="1" id="tax_calculations-view" class="checkbox" name="tax_calculations-view" <?php echo (isset($p->{'tax_calculations-view'}) && $p->{'tax_calculations-view'}) ? "checked" : ''; ?>>
+                                            <label for="tax_calculations-view" class="padding05"><?= lang('view_tax_calculation') ?></label>
+                                        </span>
+                                        <span style="display:inline-block;">
+                                            <input type="checkbox" value="1" id="tax_calculations-settings" class="checkbox" name="tax_calculations-settings" <?php echo (isset($p->{'tax_calculations-settings'}) && $p->{'tax_calculations-settings'}) ? "checked" : ''; ?>>
+                                            <label for="tax_calculations-settings" class="padding05"><?= lang('tax_settings') ?></label>
+                                        </span>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td><?= lang("inps_slabs"); ?></td>
+                                    <td class="text-center">
+                                        <input type="checkbox" value="1" class="checkbox" name="tax_calculations-inps_slabs" <?php echo (isset($p->{'tax_calculations-inps_slabs'}) && $p->{'tax_calculations-inps_slabs'}) ? "checked" : ''; ?>>
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="checkbox" value="1" class="checkbox" name="tax_calculations-add_inps_slab" <?php echo (isset($p->{'tax_calculations-add_inps_slab'}) && $p->{'tax_calculations-add_inps_slab'}) ? "checked" : ''; ?>>
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="checkbox" value="1" class="checkbox" name="tax_calculations-edit_inps_slab" <?php echo (isset($p->{'tax_calculations-edit_inps_slab'}) && $p->{'tax_calculations-edit_inps_slab'}) ? "checked" : ''; ?>>
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="checkbox" value="1" class="checkbox" name="tax_calculations-delete_inps_slab" <?php echo (isset($p->{'tax_calculations-delete_inps_slab'}) && $p->{'tax_calculations-delete_inps_slab'}) ? "checked" : ''; ?>>
+                                    </td>
+                                    <td></td>
+                                </tr>
+
+                                <tr>
                                     <td><?= lang("File_Manager"); ?></td>
                                     <td class="text-center">
                                         <input type="checkbox" value="1" id="document-file_manager" class="checkbox" name="document-file_manager" <?php echo $p->{'document-file_manager'} ? "checked" : ''; ?>>

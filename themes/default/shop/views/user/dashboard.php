@@ -170,6 +170,63 @@ $(document).ready(function() {
         </div>
     </div>
 
+    <!-- Service point notice (when not assigned) -->
+    <?php if (empty($service_point_id)): ?>
+    <div class="dashboard-section" style="background: #f8f9fa; border-left: 5px solid #6c757d;">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <i class="fa fa-info-circle" style="color: #6c757d; font-size: 20px; margin-top: 2px;"></i>
+            <div>
+                <strong style="color: #495057;"><?= lang('service_point') ?></strong>
+                <p style="margin: 8px 0 0 0; color: #6c757d; font-size: 14px;"><?= lang('not_assigned_to_service_point') ?></p>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Service Point Transfers (when assigned to a service point) -->
+    <?php if (!empty($service_point_id)): ?>
+    <div class="dashboard-section">
+        <div class="section-header">
+            <h3><i class="fa fa-truck"></i> <?= lang('service_point_transfers') ?></h3>
+            <?php if (!empty($service_point_name)): ?>
+            <span style="color: #667eea; font-weight: 600;"><?= lang('service_point') ?>: <?= htmlspecialchars($service_point_name) ?></span>
+            <?php endif; ?>
+        </div>
+        <?php if (!empty($transfers)): ?>
+        <div class="table-responsive">
+            <table class="table table-striped" style="margin: 0;">
+                <thead style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <tr>
+                        <th style="padding: 15px; border: none;"><?= lang('transfer_no') ?></th>
+                        <th style="padding: 15px; border: none;"><?= lang('date') ?></th>
+                        <th style="padding: 15px; border: none;"><?= lang('from_warehouse') ?></th>
+                        <th style="padding: 15px; border: none;"><?= lang('to_warehouse') ?></th>
+                        <th style="padding: 15px; border: none;"><?= lang('status') ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($transfers as $tr): ?>
+                    <tr>
+                        <td style="padding: 15px;"><strong><?= htmlspecialchars($tr->transfer_no) ?></strong></td>
+                        <td style="padding: 15px;"><?= $tr->date ? date('d M Y', strtotime($tr->date)) : '—' ?></td>
+                        <td style="padding: 15px;"><?= htmlspecialchars(isset($tr->from_warehouse_name) ? $tr->from_warehouse_name : '') ?></td>
+                        <td style="padding: 15px;"><?= htmlspecialchars(isset($tr->to_warehouse_name) ? $tr->to_warehouse_name : '') ?></td>
+                        <td style="padding: 15px;"><span class="payment-status <?= isset($tr->status) ? $tr->status : '' ?>"><?= isset($tr->status) ? lang($tr->status) : '—' ?></span></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php else: ?>
+        <div class="empty-state">
+            <i class="fa fa-truck"></i>
+            <h4><?= lang('transfers') ?></h4>
+            <p><?= lang('no_transfers_for_service_point') ?></p>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <!-- Income Prediction Card -->
     <?php if (isset($income_prediction) && $income_prediction && $income_prediction['missing_months_count'] > 0): ?>
     <div class="dashboard-section" style="background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%); border-left: 5px solid #667eea;">

@@ -52,6 +52,7 @@ $(document).ready(function() {
 <div class="box">
     <div class="box-header">
         <h2 class="blue"><i class="fa-fw fa fa-list"></i><?= lang('inps_rate_slabs'); ?></h2>
+        <?php if (!empty($can_add_inps_slab)): ?>
         <div class="box-icon">
             <ul class="btn-tasks">
                 <li class="dropdown">
@@ -62,6 +63,7 @@ $(document).ready(function() {
                 </li>
             </ul>
         </div>
+        <?php endif; ?>
     </div>
     <div class="box-content">
         <div class="row">

@@ -34,13 +34,12 @@ $(document).ready(function() {
         "aoColumns": [{
             "bSortable": false,
             "mRender": checkbox
-        }, null, null, null, null, null, null,  {
+        }, null, null, null, null, null, null, {
             "mRender": currencyFormat
-        }, null, {
+        }, {
             "bSortable": false
         }]
-    }).dtFilter([
-        {
+    }).dtFilter([{
             column_number: 1,
             filter_default_label: "[<?=lang('First_Name');?>]",
             filter_type: "text",
@@ -76,16 +75,10 @@ $(document).ready(function() {
             filter_type: "text",
             data: []
         },
-       
+
         {
             column_number: 7,
             filter_default_label: "[<?=lang('deposit');?>]",
-            filter_type: "text",
-            data: []
-        },
-        {
-            column_number: 8,
-            filter_default_label: "[<?=lang('Marketing_Officer');?>]",
             filter_type: "text",
             data: []
         },
@@ -161,9 +154,8 @@ $(document).ready(function() {
                                 <th><?= lang("Phone"); ?></th>
                                 <th><?= lang("Customer_Group"); ?></th>
                                 <th><?= lang("vat_no"); ?></th>
-                               
+
                                 <th><?= lang("deposit"); ?></th>
-                                <th><?= lang("Marketing_Officer"); ?></th>
                                 <th style="min-width:135px !important;"><?= lang("actions"); ?></th>
                             </tr>
                         </thead>
@@ -183,8 +175,7 @@ $(document).ready(function() {
                                 <th></th>
                                 <th></th>
                                 <th></th>
-                                
-                                <th></th>
+
                                 <th></th>
                                 <th style="min-width:135px !important;" class="text-center"><?= lang("actions"); ?></th>
                             </tr>

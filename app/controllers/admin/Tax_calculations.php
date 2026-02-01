@@ -40,19 +40,32 @@ class Tax_calculations extends MY_Controller
     public function getTaxCalculations()
     {
         $this->sma->checkPermissions('index');
-        
+
+        // Resolve warehouse_id like Sales/Purchases: only when user is available and has warehouse_id
+        $warehouse_id = null;
+        if (!$this->Owner && !$this->Admin) {
+            $user = $this->site->getUser();
+            if ($user && isset($user->warehouse_id) && $user->warehouse_id !== '' && $user->warehouse_id !== null) {
+                $warehouse_id = $user->warehouse_id;
+            }
+        }
+
         $this->load->library('datatables');
         $table = $this->db->dbprefix('companies');
-        
-        $this->datatables->select("$table.id as ids, 
+
+        $this->datatables->select("$table.id as ids,
             CONCAT($table.name, ' ', COALESCE($table.last_name, '')) as customer_name,
-            $table.company, 
+            $table.company,
             COALESCE($table.customer_type, '') as customer_type,
             COALESCE($table.tax_regime, '') as tax_regime,
-            $table.email, 
+            $table.email,
             $table.phone", FALSE)
             ->from("companies")
             ->where('group_name', 'customer');
+
+        if ($warehouse_id) {
+            $this->datatables->where("$table.warehouse_id", $warehouse_id);
+        }
 
         $view_link = anchor('admin/tax_calculations/view?customer_id=$1', '<i class="fa fa-eye"></i> ' . lang('view_tax_calculations'), 'class="tip"');
         $settings_link = anchor('admin/tax_calculations/settings?customer_id=$1', '<i class="fa fa-cog"></i> ' . lang('tax_settings'), 'class="tip"');
@@ -711,14 +724,17 @@ class Tax_calculations extends MY_Controller
     }
 
     /**
-     * Manage INPS Rate Slabs
+     * Manage INPS Rate Slabs (list)
      */
     public function inps_slabs()
     {
-        $this->sma->checkPermissions();
+        $this->sma->checkPermissions('inps_slabs');
 
         $this->data['error'] = (validation_errors()) ? validation_errors() : $this->session->flashdata('error');
         $this->data['message'] = $this->session->flashdata('message');
+        $this->data['can_add_inps_slab'] = $this->Owner || $this->Admin || (!empty($this->data['GP']['tax_calculations-add_inps_slab']));
+        $this->data['can_edit_inps_slab'] = $this->Owner || $this->Admin || (!empty($this->data['GP']['tax_calculations-edit_inps_slab']));
+        $this->data['can_delete_inps_slab'] = $this->Owner || $this->Admin || (!empty($this->data['GP']['tax_calculations-delete_inps_slab']));
 
         $bc = [
             ['link' => base_url(), 'page' => lang('home')],
@@ -734,12 +750,12 @@ class Tax_calculations extends MY_Controller
      */
     public function getINPSSlabs()
     {
-        $this->sma->checkPermissions('index');
+        $this->sma->checkPermissions('inps_slabs');
         
         $this->load->library('datatables');
         $table = $this->db->dbprefix('inps_rate_slabs');
         
-        $this->datatables->select("$table.id as ids, 
+        $this->datatables->select("$table.id as ids,
             $table.slab_year as year,
             COALESCE($table.customer_type, 'All Types') as customer_type,
             $table.income_from,
@@ -749,18 +765,16 @@ class Tax_calculations extends MY_Controller
             $table.is_active", FALSE)
             ->from("inps_rate_slabs");
 
-        $edit_link = anchor('admin/tax_calculations/edit_inps_slab/$1', '<i class="fa fa-edit"></i> ' . lang('edit'), 'class="tip" title="' . lang('edit') . '"');
-        $delete_link = "<a href='#' class='tip po' title='<b>" . lang('delete') . "</b>' data-content=\"<p>"
+        $can_edit = $this->Owner || $this->Admin || (!empty($this->data['GP']['tax_calculations-edit_inps_slab']));
+        $can_delete = $this->Owner || $this->Admin || (!empty($this->data['GP']['tax_calculations-delete_inps_slab']));
+
+        $edit_link = $can_edit ? anchor('admin/tax_calculations/edit_inps_slab/$1', '<i class="fa fa-edit"></i> ' . lang('edit'), 'class="tip" title="' . lang('edit') . '"') : '';
+        $delete_link = $can_delete ? "<a href='#' class='tip po' title='<b>" . lang('delete') . "</b>' data-content=\"<p>"
             . lang('r_u_sure') . "</p><a class='btn btn-danger po-delete' id='a__$1' href='" . admin_url('tax_calculations/delete_inps_slab/$1') . "'>"
             . lang('i_m_sure') . "</a> <button class='btn po-close'>" . lang('no') . "</button>\"  rel='popover'><i class=\"fa fa-trash-o\"></i> "
-            . lang('delete') . '</a>';
+            . lang('delete') . '</a>' : '';
 
-        $action = '<div class="text-center">
-            <div class="btn-group">
-                ' . $edit_link . '
-                ' . $delete_link . '
-            </div>
-        </div>';
+        $action = '<div class="text-center"><div class="btn-group">' . $edit_link . $delete_link . '</div></div>';
 
         $this->datatables->add_column('Actions', $action, 'ids');
         echo $this->datatables->generate();
@@ -771,11 +785,10 @@ class Tax_calculations extends MY_Controller
      */
     public function edit_inps_slab($id = NULL)
     {
-        $this->sma->checkPermissions('edit', true);
-
         if ($this->input->get('id')) {
             $id = $this->input->get('id');
         }
+        $this->sma->checkPermissions($id ? 'edit_inps_slab' : 'add_inps_slab', true);
 
         $this->form_validation->set_rules('slab_year', lang('year'), 'trim|required|numeric');
         $this->form_validation->set_rules('income_from', lang('income_from'), 'trim|required|numeric');
@@ -854,7 +867,7 @@ class Tax_calculations extends MY_Controller
      */
     public function delete_inps_slab($id = NULL)
     {
-        $this->sma->checkPermissions('delete', true);
+        $this->sma->checkPermissions('delete_inps_slab', true);
 
         if ($this->input->get('id')) {
             $id = $this->input->get('id');

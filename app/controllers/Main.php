@@ -61,6 +61,7 @@ class Main extends MY_Shop_Controller
         
         $this->lang->admin_load('sma', $user_language);
         $this->lang->admin_load('tax_calculations', $user_language);
+        $this->lang->admin_load('transfers', $user_language);
         
         // Pass current language to view
         $this->data['current_language'] = $user_language;
@@ -90,10 +91,45 @@ class Main extends MY_Shop_Controller
             redirect('/');
         }
 
+        // Load customer (company) to get service point (warehouse_id)
+        $customer = $this->site->getCompanyByID($customer_id);
+        $service_point_id = $customer && !empty($customer->warehouse_id) ? (int)$customer->warehouse_id : null;
+        $this->data['service_point_id'] = $service_point_id;
+        $this->data['customer'] = $customer;
+        
+        // Service point name for display
+        if ($service_point_id) {
+            $wh = $this->site->getWarehouseByID($service_point_id);
+            $this->data['service_point_name'] = $wh ? $wh->name : '';
+        } else {
+            $this->data['service_point_name'] = '';
+        }
+
+        // When customer is assigned to a service point: load transfers for that service point only
+        $this->data['transfers'] = array();
+        if ($service_point_id) {
+            $this->db->select('*');
+            $this->db->from('transfers');
+            $this->db->group_start();
+            $this->db->where('from_warehouse_id', $service_point_id);
+            $this->db->or_where('to_warehouse_id', $service_point_id);
+            $this->db->group_end();
+            $this->db->order_by('date', 'DESC');
+            $q = $this->db->get();
+            $rows = $q->num_rows() > 0 ? $q->result() : array();
+            foreach ($rows as $row) {
+                $from_wh = $this->site->getWarehouseByID($row->from_warehouse_id);
+                $to_wh = $this->site->getWarehouseByID($row->to_warehouse_id);
+                $row->from_warehouse_name = $from_wh ? $from_wh->name : '';
+                $row->to_warehouse_name = $to_wh ? $to_wh->name : '';
+            }
+            $this->data['transfers'] = $rows;
+        }
+
         // Get current year
         $current_year = date('Y');
         
-        // Get all tax calculations for this customer
+        // Get all tax calculations for this customer (only this customer's data)
         $this->data['tax_calculations'] = $this->tax_calculations_model->getAllTaxCalculations($customer_id);
         
         // Get tax year from request or use latest

@@ -132,6 +132,16 @@ class Transfers extends MY_Controller
     public function getTransfers()
     {
         $this->sma->checkPermissions('index');
+
+        // Resolve warehouse_id like Sales/Purchases: only when user is available and has warehouse_id
+        $warehouse_id = null;
+        if (!$this->Owner && !$this->Admin) {
+            $user = $this->site->getUser();
+            if ($user && isset($user->warehouse_id) && $user->warehouse_id !== '' && $user->warehouse_id !== null) {
+                $warehouse_id = $user->warehouse_id;
+            }
+        }
+
         $detail_link = anchor('admin/transfers/details?id=$1', '<i class="fa fa-file-text-o"></i> ' . lang('Transfer_Details'));
         $pdf_link      = anchor('admin/transfers/pdf?id=$1', '<i class="fa fa-file-pdf-o"></i> ' . lang('download_pdf'));
         $delete_link   = "<a href='#' class='tip po' title='<b>" . lang('delete_transfer') . "</b>' data-content=\"<p>"
@@ -162,7 +172,10 @@ class Transfers extends MY_Controller
             ->from('income_data')
             ->group_by("$table.reference_no");
 
-        
+        if ($warehouse_id) {
+            $this->datatables->join('companies', 'companies.id = ' . $table . '.customer_id', 'inner');
+            $this->datatables->where('companies.warehouse_id', $warehouse_id);
+        }
 
         if (!$this->Owner && !$this->Admin && !$this->session->userdata('view_right')) {
             $this->datatables->where("{$this->db->dbprefix('income_data')}.created_by", $this->session->userdata('user_id'));
@@ -419,7 +432,7 @@ class Transfers extends MY_Controller
 
     public function transfer_by_fattura()
     {
-        $this->sma->checkPermissions('csv');
+        $this->sma->checkPermissions('transfer_by_fattura');
         $this->load->helper('security');
         $this->form_validation->set_message('is_natural_no_zero', lang('no_zero_required'));
         $this->form_validation->set_rules('customer', lang("customer"), 'required');
@@ -636,7 +649,7 @@ class Transfers extends MY_Controller
 
     public function transfer_by_fattura_privati()
     {
-        $this->sma->checkPermissions('csv');
+        $this->sma->checkPermissions('transfer_by_fattura_privati');
         $this->load->helper('security');
         $this->form_validation->set_message('is_natural_no_zero', lang('no_zero_required'));
         $this->form_validation->set_rules('customer', lang("customer"), 'required');

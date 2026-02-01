@@ -360,12 +360,15 @@
                                                 <span class="chevron closed"></span>
                                             </a>
                                             <ul>
+                                                <?php if (!$this->data['GP'] || !empty($this->data['GP']['transfers-index'])): ?>
                                                 <li id="transfers_index">
                                                     <a class="submenu" href="<?= admin_url('transfers'); ?>">
                                                         <i class="fa fa-star-o"></i><span class="text">
                                                             <?= lang('list_transfers'); ?></span>
                                                     </a>
                                                 </li>
+                                                <?php endif; ?>
+                                                <?php if (!$this->data['GP'] || !empty($this->data['GP']['transfers-transfer_by_fattura_privati'])): ?>
                                                 <li id="transfers_transfer_by_fattura_privati">
                                                     <a class="submenu"
                                                         href="<?= admin_url('transfers/transfer_by_fattura_privati'); ?>">
@@ -373,6 +376,8 @@
                                                             <?= lang('Add_Transfer_Fattura_Privati'); ?></span>
                                                     </a>
                                                 </li>
+                                                <?php endif; ?>
+                                                <?php if (!$this->data['GP'] || !empty($this->data['GP']['transfers-transfer_by_fattura'])): ?>
                                                 <li id="transfers_transfer_by_fattura">
                                                     <a class="submenu"
                                                         href="<?= admin_url('transfers/transfer_by_fattura'); ?>">
@@ -380,6 +385,7 @@
                                                             <?= lang('Add_Transfer_By_Fattura'); ?></span>
                                                     </a>
                                                 </li>
+                                                <?php endif; ?>
                                             </ul>
                                         </li>
                                         <li class="mm_tax_calculations">
@@ -389,19 +395,32 @@
                                                 <span class="chevron closed"></span>
                                             </a>
                                             <ul>
+                                                <?php if (!$this->data['GP'] || !empty($this->data['GP']['tax_calculations-index'])): ?>
                                                 <li id="tax_calculations_index">
                                                     <a class="submenu" href="<?= admin_url('tax_calculations'); ?>">
                                                         <i class="fa fa-star-o"></i><span class="text">
                                                             <?= lang('list_tax_calculations'); ?></span>
                                                     </a>
                                                 </li>
+                                                <?php endif; ?>
+                                                <?php if (!$this->data['GP'] || !empty($this->data['GP']['tax_calculations-inps_slabs'])): ?>
                                                 <li id="tax_calculations_inps_slabs">
                                                     <a class="submenu"
                                                         href="<?= admin_url('tax_calculations/inps_slabs'); ?>">
-                                                        <i class="fa fa-plus-circle"></i><span class="text">
+                                                        <i class="fa fa-list"></i><span class="text">
                                                             <?= lang('inps_slabs'); ?></span>
                                                     </a>
                                                 </li>
+                                                <?php endif; ?>
+                                                <?php if (!$this->data['GP'] || !empty($this->data['GP']['tax_calculations-add_inps_slab'])): ?>
+                                                <li id="tax_calculations_add_inps_slab">
+                                                    <a class="submenu"
+                                                        href="<?= admin_url('tax_calculations/edit_inps_slab'); ?>">
+                                                        <i class="fa fa-plus-circle"></i><span class="text">
+                                                            <?= lang('add_inps_slab'); ?></span>
+                                                    </a>
+                                                </li>
+                                                <?php endif; ?>
                                             </ul>
                                         </li>
 
@@ -874,6 +893,86 @@
                                                 </li>
                                                 <?php }?>
 
+                                            </ul>
+                                        </li>
+                                        <?php } ?>
+
+                                        <?php if ((isset($GP['transfers-index']) && $GP['transfers-index']) || (isset($GP['transfers-transfer_by_fattura']) && $GP['transfers-transfer_by_fattura']) || (isset($GP['transfers-transfer_by_fattura_privati']) && $GP['transfers-transfer_by_fattura_privati']) || (isset($GP['transfers-csv']) && $GP['transfers-csv'])) { ?>
+                                        <li class="mm_transfers">
+                                            <a class="dropmenu" href="#">
+                                                <i class="fa fa-star-o"></i>
+                                                <span class="text"> <?= lang('transfers'); ?> </span>
+                                                <span class="chevron closed"></span>
+                                            </a>
+                                            <ul>
+                                                <?php if (isset($GP['transfers-index']) && $GP['transfers-index']) { ?>
+                                                <li id="transfers_index">
+                                                    <a class="submenu" href="<?= admin_url('transfers'); ?>">
+                                                        <i class="fa fa-star-o"></i><span class="text"><?= lang('list_transfers'); ?></span>
+                                                    </a>
+                                                </li>
+                                                <?php } ?>
+                                                <?php if (isset($GP['transfers-transfer_by_fattura_privati']) && $GP['transfers-transfer_by_fattura_privati']) { ?>
+                                                <li id="transfers_transfer_by_fattura_privati">
+                                                    <a class="submenu" href="<?= admin_url('transfers/transfer_by_fattura_privati'); ?>">
+                                                        <i class="fa fa-plus-circle"></i><span class="text"><?= lang('Add_Transfer_By_Fattura_Privati'); ?></span>
+                                                    </a>
+                                                </li>
+                                                <?php } ?>
+                                                <?php if (isset($GP['transfers-transfer_by_fattura']) && $GP['transfers-transfer_by_fattura']) { ?>
+                                                <li id="transfers_transfer_by_fattura">
+                                                    <a class="submenu" href="<?= admin_url('transfers/transfer_by_fattura'); ?>">
+                                                        <i class="fa fa-plus-circle"></i><span class="text"><?= lang('Add_Transfer_By_Fattura'); ?></span>
+                                                    </a>
+                                                </li>
+                                                <?php } ?>
+                                                <?php if (isset($GP['transfers-csv']) && $GP['transfers-csv']) { ?>
+                                                <li id="transfers_transfer_by_csv">
+                                                    <a class="submenu" href="<?= admin_url('transfers/transfer_by_csv'); ?>">
+                                                        <i class="fa fa-plus-circle"></i><span class="text"><?= lang('add_transfer_by_csv'); ?></span>
+                                                    </a>
+                                                </li>
+                                                <?php } ?>
+                                            </ul>
+                                        </li>
+                                        <?php } ?>
+
+                                        <?php if ((isset($GP['tax_calculations-index']) && $GP['tax_calculations-index']) || (isset($GP['tax_calculations-view']) && $GP['tax_calculations-view']) || (isset($GP['tax_calculations-settings']) && $GP['tax_calculations-settings']) || (isset($GP['tax_calculations-inps_slabs']) && $GP['tax_calculations-inps_slabs']) || (isset($GP['tax_calculations-add_inps_slab']) && $GP['tax_calculations-add_inps_slab'])) { ?>
+                                        <li class="mm_tax_calculations">
+                                            <a class="dropmenu" href="#">
+                                                <i class="fa fa-star-o"></i>
+                                                <span class="text"> <?= lang('tax_calculations'); ?> </span>
+                                                <span class="chevron closed"></span>
+                                            </a>
+                                            <ul>
+                                                <?php if (isset($GP['tax_calculations-index']) && $GP['tax_calculations-index']) { ?>
+                                                <li id="tax_calculations_index">
+                                                    <a class="submenu" href="<?= admin_url('tax_calculations'); ?>">
+                                                        <i class="fa fa-star-o"></i><span class="text"><?= lang('list_tax_calculations'); ?></span>
+                                                    </a>
+                                                </li>
+                                                <?php } ?>
+                                                <?php if (isset($GP['tax_calculations-settings']) && $GP['tax_calculations-settings']) { ?>
+                                                <li id="tax_calculations_settings">
+                                                    <a class="submenu" href="<?= admin_url('tax_calculations/settings'); ?>">
+                                                        <i class="fa fa-cog"></i><span class="text"><?= lang('tax_settings'); ?></span>
+                                                    </a>
+                                                </li>
+                                                <?php } ?>
+                                                <?php if (isset($GP['tax_calculations-inps_slabs']) && $GP['tax_calculations-inps_slabs']) { ?>
+                                                <li id="tax_calculations_inps_slabs">
+                                                    <a class="submenu" href="<?= admin_url('tax_calculations/inps_slabs'); ?>">
+                                                        <i class="fa fa-list"></i><span class="text"><?= lang('inps_slabs'); ?></span>
+                                                    </a>
+                                                </li>
+                                                <?php } ?>
+                                                <?php if (isset($GP['tax_calculations-add_inps_slab']) && $GP['tax_calculations-add_inps_slab']) { ?>
+                                                <li id="tax_calculations_add_inps_slab">
+                                                    <a class="submenu" href="<?= admin_url('tax_calculations/edit_inps_slab'); ?>">
+                                                        <i class="fa fa-plus-circle"></i><span class="text"><?= lang('add_inps_slab'); ?></span>
+                                                    </a>
+                                                </li>
+                                                <?php } ?>
                                             </ul>
                                         </li>
                                         <?php } ?>

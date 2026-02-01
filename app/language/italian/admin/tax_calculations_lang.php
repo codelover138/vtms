@@ -261,3 +261,11 @@ $lang['based_on_ateco_code']                               = "In base al codice 
 $lang['based_on_profitability']                            = "In base alla redditività";
 $lang['redditivita']                                       = "redditività";
 $lang['download_conto_economico_pdf']                      = "Scarica PDF Conto Economico";
+
+// Service point (user dashboard)
+$lang['service_point']                                     = "Punto di servizio";
+$lang['service_point_transfers']                           = "Trasferimenti punto di servizio";
+$lang['not_assigned_to_service_point']                    = "Non sei assegnato a un punto di servizio. Sono visibili solo i calcoli fiscali. Contatta l'amministratore per essere assegnato a un punto di servizio.";
+$lang['no_transfers_for_service_point']                   = "Nessun trasferimento per il tuo punto di servizio.";
+$lang['transfer_no']                                       = "N. Trasferimento";
+$lang['date']                                              = "Data";

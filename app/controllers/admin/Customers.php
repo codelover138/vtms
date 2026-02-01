@@ -33,18 +33,19 @@ class Customers extends MY_Controller
 
     function getCustomers()
     {
-        $warehouse_id='';
+        $warehouse_id = null;
         $this->sma->checkPermissions('index');
-         if ((!$this->Owner || !$this->Admin) && !$warehouse_id) {
+        if (!$this->Owner && !$this->Admin) {
             $user = $this->site->getUser();
-            $warehouse_id = $user->warehouse_id;
+            if ($user && isset($user->warehouse_id) && $user->warehouse_id !== '' && $user->warehouse_id !== null) {
+                $warehouse_id = $user->warehouse_id;
+            }
         }
         $this->load->library('datatables');
-        if($warehouse_id){
+        if ($warehouse_id) {
               $this->datatables
-            ->select("companies.id as ids, companies.name,companies.last_name, companies.email, companies.phone,companies.customer_group_name, companies.vat_no, companies.deposit_amount, CONCAT({$this->db->dbprefix('users')}.first_name, ' ', {$this->db->dbprefix('users')}.last_name) as created_by")
+            ->select("companies.id as ids, companies.name,companies.last_name, companies.email, companies.phone,companies.customer_group_name, companies.vat_no, companies.deposit_amount")
             ->from("companies")
-             ->join('users', 'companies.marketing_officer=users.id', 'left')
             ->where('group_name', 'customer')
             ->where('companies.warehouse_id', $warehouse_id)
             ->add_column("Actions", "<div class=\"text-center\"><a class=\"tip\" title='" . lang("list_deposits") . "' href='" . admin_url('customers/deposits/$1') . "' data-toggle='modal' data-target='#myModal'><i class=\"fa fa-money\"></i></a> <a class=\"tip\" title='" . lang("add_deposit") . "' href='" . admin_url('customers/add_deposit/$1') . "' data-toggle='modal' data-target='#myModal'><i class=\"fa fa-plus\"></i></a> <a class=\"tip\" title='" . lang("list_addresses") . "' href='" . admin_url('customers/addresses/$1') . "' data-toggle='modal' data-target='#myModal'><i class=\"fa fa-location-arrow\"></i></a> <a class=\"tip\" title='" . lang("list_users") . "' href='" . admin_url('customers/users/$1') . "' data-toggle='modal' data-target='#myModal'><i class=\"fa fa-users\"></i></a> <a class=\"tip\" title='" . lang("add_user") . "' href='" . admin_url('customers/add_user/$1') . "' data-toggle='modal' data-target='#myModal'><i class=\"fa fa-user-plus\"></i></a> <a class=\"tip\" title='" . lang("edit_customer") . "' href='" . admin_url('customers/edit/$1') . "' data-toggle='modal' data-target='#myModal'><i class=\"fa fa-edit\"></i></a> <a href='#' class='tip po' title='<b>" . lang("delete_customer") . "</b>' data-content=\"<p>" . lang('r_u_sure') . "</p><a class='btn btn-danger po-delete' href='" . admin_url('customers/delete/$1') . "'>" . lang('i_m_sure') . "</a> <button class='btn po-close'>" . lang('no') . "</button>\"  rel='popover'><i class=\"fa fa-trash-o\"></i></a></div>", "ids");
@@ -52,9 +53,8 @@ class Customers extends MY_Controller
         echo $this->datatables->generate();
         }else {
         $this->datatables
-            ->select("companies.id as ids, companies.name,companies.last_name, companies.email, companies.phone,companies.customer_group_name, companies.vat_no, companies.deposit_amount, CONCAT({$this->db->dbprefix('users')}.first_name, ' ', {$this->db->dbprefix('users')}.last_name) as created_by")
+            ->select("companies.id as ids, companies.name,companies.last_name, companies.email, companies.phone,companies.customer_group_name, companies.vat_no, companies.deposit_amount")
             ->from("companies")
-             ->join('users', 'companies.marketing_officer=users.id', 'left')
             ->where('group_name', 'customer')
             ->add_column("Actions", "<div class=\"text-center\"><a class=\"tip\" title='" . lang("list_deposits") . "' href='" . admin_url('customers/deposits/$1') . "' data-toggle='modal' data-target='#myModal'><i class=\"fa fa-money\"></i></a> <a class=\"tip\" title='" . lang("add_deposit") . "' href='" . admin_url('customers/add_deposit/$1') . "' data-toggle='modal' data-target='#myModal'><i class=\"fa fa-plus\"></i></a> <a class=\"tip\" title='" . lang("list_addresses") . "' href='" . admin_url('customers/addresses/$1') . "' data-toggle='modal' data-target='#myModal'><i class=\"fa fa-location-arrow\"></i></a> <a class=\"tip\" title='" . lang("list_users") . "' href='" . admin_url('customers/users/$1') . "' data-toggle='modal' data-target='#myModal'><i class=\"fa fa-users\"></i></a> <a class=\"tip\" title='" . lang("add_user") . "' href='" . admin_url('customers/add_user/$1') . "' data-toggle='modal' data-target='#myModal'><i class=\"fa fa-user-plus\"></i></a> <a class=\"tip\" title='" . lang("edit_customer") . "' href='" . admin_url('customers/edit/$1') . "' data-toggle='modal' data-target='#myModal'><i class=\"fa fa-edit\"></i></a> <a href='#' class='tip po' title='<b>" . lang("delete_customer") . "</b>' data-content=\"<p>" . lang('r_u_sure') . "</p><a class='btn btn-danger po-delete' href='" . admin_url('customers/delete/$1') . "'>" . lang('i_m_sure') . "</a> <button class='btn po-close'>" . lang('no') . "</button>\"  rel='popover'><i class=\"fa fa-trash-o\"></i></a></div>", "ids");
         //->unset_column('id');
