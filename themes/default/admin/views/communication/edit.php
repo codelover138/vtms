@@ -48,14 +48,18 @@ $(document).ready(function() {
             audio: true
         }).then(function(stream) {
             recordedChunks = [];
+            var mimeType = 'audio/webm';
+            var ext = 'webm';
+            if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/mp4')) {
+                mimeType = 'audio/mp4';
+                ext = 'm4a';
+            }
             try {
-                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType: mimeType } : undefined);
             } catch (e) {
-                $status.text('MediaRecorder not supported.');
-                stream.getTracks().forEach(function(t) {
-                    t.stop();
-                });
-                return;
+                mediaRecorder = new MediaRecorder(stream);
+                mimeType = (mediaRecorder.mimeType || '').indexOf('mp4') !== -1 ? 'audio/mp4' : 'audio/webm';
+                ext = mimeType.indexOf('mp4') !== -1 ? 'm4a' : 'webm';
             }
             mediaRecorder.ondataavailable = function(e) {
                 if (e.data.size > 0) recordedChunks.push(e.data);
@@ -65,12 +69,9 @@ $(document).ready(function() {
                     t.stop();
                 });
                 if (recordedChunks.length === 0) return;
-                var blob = new Blob(recordedChunks, {
-                    type: 'audio/webm'
-                });
-                var file = new File([blob], 'voice_' + new Date().getTime() + '.webm', {
-                    type: 'audio/webm'
-                });
+                var blob = new Blob(recordedChunks, { type: mimeType });
+                var fileName = 'voice_' + new Date().getTime() + '.' + ext;
+                var file = new File([blob], fileName, { type: mimeType });
                 var dt = new DataTransfer();
                 dt.items.add(file);
                 document.getElementById('voice_file').files = dt.files;

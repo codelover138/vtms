@@ -22,7 +22,7 @@ class Communication extends MY_Controller
         $this->upload_path = 'assets/uploads/communication';
         $this->thumbs_path = 'assets/uploads/thumbs/';
         $this->image_types = 'gif|jpg|jpeg|png|tif';
-        $this->digital_file_types = 'zip|psd|ai|rar|pdf|doc|docx|xls|xlsx|ppt|pptx|gif|jpg|jpeg|png|tif|txt|mp4|webm|avi|mov|mp3|wav|ogg|m4a';
+        $this->digital_file_types = 'zip|psd|ai|rar|pdf|doc|docx|xls|xlsx|ppt|pptx|gif|jpg|jpeg|png|tif|txt|mp4|webm|avi|mov|mp3|wav|ogg|m4a|caf|aac';
         $this->allowed_file_size = '20480';
         $this->data['logo'] = true;
     }
@@ -310,6 +310,7 @@ class Communication extends MY_Controller
                     'max_size' => $this->allowed_file_size,
                     'overwrite' => false,
                     'file_name' => $file_name,
+                    'ignore_mime' => true,
                 );
                 $this->upload->initialize($config);
                 if ($this->upload->do_upload('single_file')) {
