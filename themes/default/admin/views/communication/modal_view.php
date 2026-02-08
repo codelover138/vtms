@@ -36,42 +36,38 @@
                
                 <div class="col-xs-6">
                     <?php echo $this->lang->line("Customer"); ?>:<br/>
-                    <h2 style="margin-top:10px;"><?= $customer->name.' '.$customer->last_name; ?></h2>
-                    <?= $customer->company && $customer->company != '-' ? "" : "Attn: " . $customer->name ?>
-
-                    <?php
-                    echo $customer->address . "<br>" . $customer->city . " " . $customer->postal_code . " " . $customer->state . "<br>" . $customer->country;
-
-                    echo "<p>";
-
-                    if ($customer->vat_no != "-" && $customer->vat_no != "") {
-                        echo "<br>" . lang("vat_no") . ": " . $customer->vat_no;
-                    }
-                    if ($customer->gst_no != "-" && $customer->gst_no != "") {
-                        echo "<br>" . lang("dob") . ": " . $customer->gst_no;
-                    }
-                    if ($customer->cf1 != "-" && $customer->cf1 != "") {
-                        echo "<br>" . lang("document_number") . ": " . $customer->cf1;
-                    }
-                    if ($customer->cf2 != "-" && $customer->cf2 != "") {
-                        echo "<br>" . lang("document_issue_date") . ": " . $customer->cf2;
-                    }
-                    if ($customer->cf3 != "-" && $customer->cf3 != "") {
-                        echo "<br>" . lang("document_expire_date") . ": " . $customer->cf3;
-                    }
-                    if ($customer->cf4 != "-" && $customer->cf4 != "") {
-                        echo "<br>" . lang("ccf4") . ": " . $customer->cf4;
-                    }
-                    if ($customer->cf5 != "-" && $customer->cf5 != "") {
-                        echo "<br>" . lang("ccf5") . ": " . $customer->cf5;
-                    }
-                    if ($customer->cf6 != "-" && $customer->cf6 != "") {
-                        echo "<br>" . lang("ccf6") . ": " . $customer->cf6;
-                    }
-
-                    echo "</p>";
-                    echo lang("tel") . ": " . $customer->phone . "<br>" . lang("email") . ": " . $customer->email;
-                    ?>
+                    <h2 style="margin-top:10px;"><?= htmlspecialchars($inv->customer); ?></h2>
+                    <?php if ($customer) {
+                        echo $customer->company && $customer->company != '-' ? "" : "Attn: " . $customer->name;
+                        echo "<br>" . $customer->address . "<br>" . $customer->city . " " . $customer->postal_code . " " . $customer->state . "<br>" . $customer->country;
+                        echo "<p>";
+                        if ($customer->vat_no != "-" && $customer->vat_no != "") {
+                            echo "<br>" . lang("vat_no") . ": " . $customer->vat_no;
+                        }
+                        if ($customer->gst_no != "-" && $customer->gst_no != "") {
+                            echo "<br>" . lang("dob") . ": " . $customer->gst_no;
+                        }
+                        if ($customer->cf1 != "-" && $customer->cf1 != "") {
+                            echo "<br>" . lang("document_number") . ": " . $customer->cf1;
+                        }
+                        if ($customer->cf2 != "-" && $customer->cf2 != "") {
+                            echo "<br>" . lang("document_issue_date") . ": " . $customer->cf2;
+                        }
+                        if ($customer->cf3 != "-" && $customer->cf3 != "") {
+                            echo "<br>" . lang("document_expire_date") . ": " . $customer->cf3;
+                        }
+                        if ($customer->cf4 != "-" && $customer->cf4 != "") {
+                            echo "<br>" . lang("ccf4") . ": " . $customer->cf4;
+                        }
+                        if ($customer->cf5 != "-" && $customer->cf5 != "") {
+                            echo "<br>" . lang("ccf5") . ": " . $customer->cf5;
+                        }
+                        if ($customer->cf6 != "-" && $customer->cf6 != "") {
+                            echo "<br>" . lang("ccf6") . ": " . $customer->cf6;
+                        }
+                        echo "</p>";
+                        echo lang("tel") . ": " . $customer->phone . "<br>" . lang("email") . ": " . $customer->email;
+                    } ?>
                 </div>
 
                 <div class="col-xs-6">
@@ -81,6 +77,12 @@
                     echo $warehouse->address . '<br>';
                     echo ($warehouse->phone ? lang('tel') . ': ' . $warehouse->phone . '<br>' : '') . ($warehouse->email ? lang('email') . ': ' . $warehouse->email : '');
                     ?>
+                    <?php if (!empty($inv->status) || isset($assign_to_user)) { ?>
+                        <br><span><strong>Status:</strong> <?= isset($inv->status) ? htmlspecialchars($inv->status) : '-'; ?></span>
+                        <?php if (isset($assign_to_user) && $assign_to_user) { ?>
+                        <br><span><strong>Assign To:</strong> <?= htmlspecialchars($assign_to_user->first_name . ' ' . $assign_to_user->last_name); ?></span>
+                        <?php } ?>
+                    <?php } ?>
                     <?php
                     if(isset($service_provider)){ ?>
                         <br><span><?=lang('assign_service_provider')?>: <?php echo $service_provider->first_name.' '.$service_provider->last_name;?></span>
@@ -105,7 +107,17 @@
                                 <p class="bold"><?= lang("note"); ?>:</p>
                                 <div><?= $this->sma->decode_html($inv->note); ?></div>
                             </div>
-                       
+                            <?php if (!empty($inv->attachment)) {
+                                $files = is_array($inv->attachment) ? $inv->attachment : explode(',', $inv->attachment);
+                                echo '<div class="well well-sm" style="margin-top:10px;"><p class="bold">' . lang('attachment') . ':</p><ul class="list-unstyled">';
+                                foreach ($files as $f) {
+                                    $f = trim($f);
+                                    if (!$f) continue;
+                                    $name = basename($f);
+                                    echo '<li><a href="' . base_url($f) . '" target="_blank"><i class="fa fa-file-o"></i> ' . htmlspecialchars($name) . '</a></li>';
+                                }
+                                echo '</ul></div>';
+                            } ?>
                 </div>
 
               
@@ -113,7 +125,7 @@
                 <div class="col-xs-5 pull-right">
                     <div class="well well-sm">
                         <p>
-                            <?= lang("created_by"); ?>: <?= $inv->created_by ? $created_by->first_name . ' ' . $created_by->last_name : $customer->name; ?> <br>
+                            <?= lang("created_by"); ?>: <?= $inv->created_by && isset($created_by) ? $created_by->first_name . ' ' . $created_by->last_name : '-'; ?> <br>
                             <?= lang("date"); ?>: <?= $this->sma->hrld($inv->created_date); ?>
                         </p>
                         <?php if ($inv->updated_by) { ?>

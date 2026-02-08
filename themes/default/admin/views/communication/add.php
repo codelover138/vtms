@@ -32,7 +32,7 @@ var count = 1,
             localStorage.removeItem('remove_slls');
         }
 
-
+        // Same as Add Sale: default to today when no stored date, else restore from localStorage
         if (!localStorage.getItem('sldate')) {
             $("#sldate").datetimepicker({
                 format: site.dateFormats.js_ldate,
@@ -84,7 +84,7 @@ var count = 1,
                         <div class="col-md-6">
                             <div class="form-group">
                                 <?= lang("date", "sldate"); ?>
-                                <?php echo form_input('date', (isset($_POST['date']) ? $_POST['date'] : ""), 'class="form-control input-tip date" id="sldate" required="required"'); ?>
+                                <?php echo form_input('date', (isset($_POST['date']) ? $_POST['date'] : $this->sma->hrsd(date('Y-m-d'))), 'class="form-control input-tip date" id="sldate" required="required"'); ?>
                             </div>
                         </div>
 
@@ -92,7 +92,7 @@ var count = 1,
                         <div class="col-md-6">
                             <div class="form-group">
                                 <?= lang("reference_no", "slref"); ?>
-                                <?php echo form_input('reference_no', (isset($_POST['reference_no']) ? $_POST['reference_no'] : $slnumber), 'class="form-control input-tip" id="slref"'); ?>
+                                <?php echo form_input('reference_no', (isset($_POST['reference_no']) ? $_POST['reference_no'] : $slnumber), 'class="form-control input-tip" id="slref" required="required"'); ?>
                             </div>
                         </div>
 
@@ -128,36 +128,35 @@ var count = 1,
                                     <div class="col-md-4">
                                         <div class="form-group">
                                             <?= lang("customer", "slcustomer"); ?>
-                                            <div class="input-group">
-                                                <?php
-                                                echo form_input('customer', (isset($_POST['customer']) ? $_POST['customer'] : ""), 'id="slcustomer" data-placeholder="' . lang("select") . ' ' . lang("customer") . '" required="required" class="form-control input-tip" style="width:100%;"');
-                                                ?>
-                                                <div class="input-group-addon no-print"
-                                                    style="padding: 2px 8px; border-left: 0;">
-                                                    <a href="#" id="toogle-customer-read-attr" class="external">
-                                                        <i class="fa fa-pencil" id="addIcon"
-                                                            style="font-size: 1.2em;"></i>
-                                                    </a>
-                                                </div>
-                                                <div class="input-group-addon no-print"
-                                                    style="padding: 2px 7px; border-left: 0;">
-                                                    <a href="#" id="view-customer" class="external" data-toggle="modal"
-                                                        data-target="#myModal">
-                                                        <i class="fa fa-eye" id="addIcon" style="font-size: 1.2em;"></i>
-                                                    </a>
-                                                </div>
-                                                <?php if ($Owner || $Admin || $GP['customers-add']) { ?>
-                                                <div class="input-group-addon no-print" style="padding: 2px 8px;">
-                                                    <a href="<?= admin_url('customers/add'); ?>" id="add-customer"
-                                                        class="external" data-toggle="modal" data-target="#myModal">
-                                                        <i class="fa fa-plus-circle" id="addIcon"
-                                                            style="font-size: 1.2em;"></i>
-                                                    </a>
-                                                </div>
-                                                <?php } ?>
-                                            </div>
+                                            <?php
+                                            echo form_input('customer', (isset($_POST['customer']) ? $_POST['customer'] : ""), 'id="slcustomer" placeholder="' . lang("customer") . '" required="required" class="form-control input-tip"'); ?>
                                         </div>
                                     </div>
+                                    <?php if (!empty($has_assign_status)) { ?>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label for="assign_id">Assign To</label>
+                                            <?php
+                                            $users_opts = array('' => lang('select'));
+                                            if (!empty($users)) {
+                                                foreach ($users as $u) {
+                                                    $users_opts[$u->id] = $u->first_name . ' ' . $u->last_name;
+                                                }
+                                            }
+                                            $default_assign = isset($_POST['assign_id']) ? $_POST['assign_id'] : (isset($default_assign_id) ? $default_assign_id : '');
+                                            echo form_dropdown('assign_id', $users_opts, $default_assign, 'id="assign_id" class="form-control" required="required"');
+                                            ?>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label for="status">Status</label>
+                                            <?php
+                                            echo form_dropdown('status', isset($status_options) ? $status_options : array('New' => 'New'), (isset($_POST['status']) ? $_POST['status'] : 'New'), 'id="status" class="form-control" required="required"');
+                                            ?>
+                                        </div>
+                                    </div>
+                                    <?php } ?>
                                 </div>
                             </div>
 
@@ -170,13 +169,39 @@ var count = 1,
                                 <div class="col-md-12">
                                     <div class="form-group">
                                         <?= lang("note", "slnote"); ?>
-                                        <?php echo form_textarea('note', (isset($_POST['note']) ? $_POST['note'] : ""), 'class="form-control" required="required" id="slnote" style="margin-top: 10px; height: 100px;"'); ?>
-
+                                        <?php echo form_textarea('note', (isset($_POST['note']) ? $_POST['note'] : ""), 'class="form-control" id="slnote" style="margin-top: 10px; height: 100px;"'); ?>
                                     </div>
                                 </div>
                             </div>
-
                         </div>
+
+
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="attachment"><?= lang('attachment'); ?> (video/audio/PDF/DOC)</label>
+                                <input type="file" name="attachment[]" id="attachment" class="form-control file"
+                                    data-browse-label="<?= lang('browse'); ?>" data-show-upload="false"
+                                    data-show-preview="false" multiple
+                                    accept=".pdf,.doc,.docx,.mp4,.webm,.avi,.mov,.mp3,.wav,.ogg,.m4a">
+                                <p class="help-block">PDF, DOC, DOCX, MP4, WebM, MP3, WAV, etc. (max 20MB per file)
+                                </p>
+                            </div>
+                            <div class="form-group">
+                                <label>Record voice (like WhatsApp)</label>
+                                <div class="voice-record-wrapper">
+                                    <button type="button" id="btn-record-voice" class="btn btn-default"><i
+                                            class="fa fa-microphone"></i> Record voice</button>
+                                    <button type="button" id="btn-stop-voice" class="btn btn-danger"
+                                        style="display:none;"><i class="fa fa-stop"></i> Stop</button>
+                                    <span id="voice-status" class="text-muted small"></span>
+                                </div>
+                                <input type="text" id="voice-file-name" class="form-control" readonly
+                                    placeholder="Recorded file name will appear here"
+                                    style="margin-top:6px; background:#fff; cursor:default;">
+                                <input type="file" name="attachment[]" id="voice_file" class="hidden" accept="audio/*">
+                            </div>
+                        </div>
+
                         <div class="col-md-12">
                             <div class="fprom-group">
                                 <?php echo form_submit('add_sale', lang("submit"), 'id="add_sale" class="btn btn-primary"  style="padding: 6px 15px; margin:15px 0;"'); ?>
@@ -197,38 +222,66 @@ var count = 1,
 
 <script type="text/javascript">
 $(document).ready(function() {
-    $('#gccustomer').select2({
-        minimumInputLength: 1,
-        ajax: {
-            url: site.base_url + "customers/suggestions",
-            dataType: 'json',
-            quietMillis: 15,
-            data: function(term, page) {
-                return {
-                    term: term,
-                    limit: 10
-                };
-            },
-            results: function(data, page) {
-                if (data.results != null) {
-                    return {
-                        results: data.results
-                    };
-                } else {
-                    return {
-                        results: [{
-                            id: '',
-                            text: 'No Match Found'
-                        }]
-                    };
-                }
-            }
+    // Voice recording (WhatsApp-style)
+    var mediaRecorder = null,
+        recordedChunks = [];
+    var $btnRecord = $('#btn-record-voice'),
+        $btnStop = $('#btn-stop-voice'),
+        $status = $('#voice-status');
+    $('#btn-record-voice').on('click', function() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            $status.text(
+                'Recording not supported in this browser. Use a modern browser (Chrome, Firefox, Edge).'
+            );
+            return;
         }
+        navigator.mediaDevices.getUserMedia({
+            audio: true
+        }).then(function(stream) {
+            recordedChunks = [];
+            try {
+                mediaRecorder = new MediaRecorder(stream);
+            } catch (e) {
+                $status.text('MediaRecorder not supported.');
+                stream.getTracks().forEach(function(t) {
+                    t.stop();
+                });
+                return;
+            }
+            mediaRecorder.ondataavailable = function(e) {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+            mediaRecorder.onstop = function() {
+                stream.getTracks().forEach(function(t) {
+                    t.stop();
+                });
+                if (recordedChunks.length === 0) return;
+                var blob = new Blob(recordedChunks, {
+                    type: 'audio/webm'
+                });
+                var file = new File([blob], 'voice_' + new Date().getTime() + '.webm', {
+                    type: 'audio/webm'
+                });
+                var dt = new DataTransfer();
+                dt.items.add(file);
+                document.getElementById('voice_file').files = dt.files;
+                $('#voice-file-name').val(file.name);
+                $status.text('Voice recorded. It will be uploaded with the form.');
+            };
+            mediaRecorder.start();
+            $btnRecord.hide();
+            $btnStop.show();
+            $status.text('Recording...');
+        }).catch(function(err) {
+            $status.text('Microphone access denied or error: ' + (err.message || err));
+        });
     });
-    $('#genNo').click(function() {
-        var no = generateCardNo();
-        $(this).parent().parent('.input-group').children('input').val(no);
-        return false;
+    $('#btn-stop-voice').on('click', function() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            $btnStop.hide();
+            $btnRecord.show();
+        }
     });
 });
 </script>

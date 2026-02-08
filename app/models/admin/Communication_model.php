@@ -2,14 +2,39 @@
 
 class Communication_model extends CI_Model
 {
+    protected static $_has_attachment_column;
 
     public function __construct()
     {
         parent::__construct();
     }
 
- 
+    /**
+     * Check if sma_communication table has the attachment column (so we don't error if migration not run).
+     */
+    public function has_attachment_column()
+    {
+        if (self::$_has_attachment_column !== null) {
+            return self::$_has_attachment_column;
+        }
+        $table = $this->db->dbprefix('communication');
+        $q = $this->db->query("SHOW COLUMNS FROM `{$table}` LIKE 'attachment'");
+        self::$_has_attachment_column = ($q->num_rows() > 0);
+        return self::$_has_attachment_column;
+    }
 
+    protected static $_has_assign_status_columns;
+
+    public function has_assign_status_columns()
+    {
+        if (self::$_has_assign_status_columns !== null) {
+            return self::$_has_assign_status_columns;
+        }
+        $table = $this->db->dbprefix('communication');
+        $q = $this->db->query("SHOW COLUMNS FROM `{$table}` WHERE Field IN ('assign_id', 'status')");
+        self::$_has_assign_status_columns = ($q->num_rows() >= 2);
+        return self::$_has_assign_status_columns;
+    }
 
     public function getCommunicationByID($id)
     {
@@ -24,6 +49,12 @@ class Communication_model extends CI_Model
 
     public function add($data = array())
     {
+        if (!$this->has_attachment_column() && array_key_exists('attachment', $data)) {
+            unset($data['attachment']);
+        }
+        if (!$this->has_assign_status_columns()) {
+            unset($data['assign_id'], $data['status']);
+        }
         if ($this->db->insert('communication', $data)) {
             $id = $this->db->insert_id();
             return $id;
@@ -34,6 +65,12 @@ class Communication_model extends CI_Model
 
     public function update($id, $data)
     {
+        if (!$this->has_attachment_column() && array_key_exists('attachment', $data)) {
+            unset($data['attachment']);
+        }
+        if (!$this->has_assign_status_columns()) {
+            unset($data['assign_id'], $data['status']);
+        }
         if ($this->db->update('communication', $data, array('id' => $id))) {
             return true;
         }
@@ -440,6 +477,28 @@ class Communication_model extends CI_Model
             return $data;
         }
         return FALSE;
+    }
+
+    /**
+     * Get users list for Assign To dropdown.
+     * @param bool $is_owner If true, include all staff; if false, exclude group_id 1 (owner).
+     */
+    public function getAssignUsers($is_owner = false)
+    {
+        if (!$is_owner) {
+            $this->db->where('group_id !=', 1);
+        }
+        $this->db->where('group_id !=', 3)->where('group_id !=', 4);
+        $this->db->order_by('first_name', 'asc');
+        $q = $this->db->get('users');
+        if ($q->num_rows() > 0) {
+            $data = array();
+            foreach ($q->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return array();
     }
 
     public function getStaff()

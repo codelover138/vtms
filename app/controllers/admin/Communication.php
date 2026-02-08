@@ -19,10 +19,10 @@ class Communication extends MY_Controller
         $this->load->library('form_validation');
         $this->load->admin_model('communication_model');
         $this->digital_upload_path = 'files/';
-        $this->upload_path = 'assets/uploads/';
+        $this->upload_path = 'assets/uploads/communication';
         $this->thumbs_path = 'assets/uploads/thumbs/';
         $this->image_types = 'gif|jpg|jpeg|png|tif';
-        $this->digital_file_types = 'zip|psd|ai|rar|pdf|doc|docx|xls|xlsx|ppt|pptx|gif|jpg|jpeg|png|tif|txt';
+        $this->digital_file_types = 'zip|psd|ai|rar|pdf|doc|docx|xls|xlsx|ppt|pptx|gif|jpg|jpeg|png|tif|txt|mp4|webm|avi|mov|mp3|wav|ogg|m4a';
         $this->allowed_file_size = '20480';
         $this->data['logo'] = true;
     }
@@ -58,10 +58,10 @@ class Communication extends MY_Controller
         
         $edit_link = anchor('admin/communication/edit/$1', '<i class="fa fa-edit"></i> ' . lang('Edit'), 'class="sledit"');
        
-        $delete_link = "<a href='#' class='po' title='<b>" . lang("Delete") . "</b>' data-content=\"<p>"
+        $delete_link = "<a href='#' class='po' title='<b>" . lang("delete") . "</b>' data-content=\"<p>"
             . lang('r_u_sure') . "</p><a class='btn btn-danger po-delete' href='" . admin_url('communication/delete/$1') . "'>"
             . lang('i_m_sure') . "</a> <button class='btn po-close'>" . lang('no') . "</button>\"  rel='popover'><i class=\"fa fa-trash-o\"></i> "
-            . lang('Delete') . "</a>";
+            . lang('delete') . "</a>";
         $action = '<div class="text-center"><div class="btn-group text-left">'
             . '<button type="button" class="btn btn-default btn-xs btn-primary dropdown-toggle" data-toggle="dropdown">'
             . lang('actions') . ' <span class="caret"></span></button>
@@ -75,22 +75,41 @@ class Communication extends MY_Controller
         //$action = '<div class="text-center">' . $detail_link . ' ' . $edit_link . ' ' . $email_link . ' ' . $delete_link . '</div>';
 
         $this->load->library('datatables');
-        if ($warehouse_id) {
-            $this->datatables
-                ->select("{$this->db->dbprefix('communication')}.id as id, {$this->db->dbprefix('communication')}.date, reference_no, {$this->db->dbprefix('warehouses')}.name as wname, {$this->db->dbprefix('communication')}.customer,{$this->db->dbprefix('companies')}.phone, CONCAT(" . $this->db->dbprefix('users') . ".first_name, ' ', " . $this->db->dbprefix('users') . ".last_name) as created_by,SUBSTRING({$this->db->dbprefix('communication')}.note, 1, 30) AS short_description")
-                ->from('communication')
-                ->join('warehouses', 'warehouses.id=communication.warehouse_id', 'inner')
-                  ->join('companies', 'companies.id=communication.customer_id', 'inner')
-                 ->join('users', 'users.id=communication.created_by', 'inner')
-                ->where('communication.warehouse_id', $warehouse_id);
+        $has_assign_status = $this->communication_model->has_assign_status_columns();
+        if ($has_assign_status) {
+            $select_str = "{$this->db->dbprefix('communication')}.id as id, {$this->db->dbprefix('communication')}.date, reference_no, {$this->db->dbprefix('warehouses')}.name as wname, {$this->db->dbprefix('communication')}.customer, CONCAT(" . $this->db->dbprefix('users') . ".first_name, ' ', " . $this->db->dbprefix('users') . ".last_name) as created_by, {$this->db->dbprefix('communication')}.status, IFNULL(CONCAT(assign_users.first_name, ' ', assign_users.last_name), '') as assign_to";
         } else {
-            $this->datatables
-               ->select("{$this->db->dbprefix('communication')}.id as id, {$this->db->dbprefix('communication')}.date, reference_no,{$this->db->dbprefix('warehouses')}.name as wname, {$this->db->dbprefix('communication')}.customer,{$this->db->dbprefix('companies')}.phone,CONCAT(" . $this->db->dbprefix('users') . ".first_name, ' ', " . $this->db->dbprefix('users') . ".last_name) as created_by,SUBSTRING({$this->db->dbprefix('communication')}.note, 1, 30) AS short_description")
-                ->from('communication')
-                  ->join('users', 'users.id=communication.created_by', 'inner')
-                  ->join('companies', 'companies.id=communication.customer_id', 'inner')
-                ->join('warehouses', 'warehouses.id=communication.warehouse_id', 'inner');
+            $select_str = "{$this->db->dbprefix('communication')}.id as id, {$this->db->dbprefix('communication')}.date, reference_no, {$this->db->dbprefix('warehouses')}.name as wname, {$this->db->dbprefix('communication')}.customer, CONCAT(" . $this->db->dbprefix('users') . ".first_name, ' ', " . $this->db->dbprefix('users') . ".last_name) as created_by, '' as status, '' as assign_to";
         }
+
+        if ($warehouse_id) {
+            $this->datatables->select($select_str)->from('communication')
+                ->join('warehouses', 'warehouses.id=communication.warehouse_id', 'inner')
+                ->join('companies', 'companies.id=communication.customer_id', 'left')
+                ->join('users', 'users.id=communication.created_by', 'inner');
+            if ($has_assign_status) {
+                $this->datatables->join('users as assign_users', 'assign_users.id=communication.assign_id', 'left');
+            }
+            $this->datatables->where('communication.warehouse_id', $warehouse_id);
+        } else {
+            $this->datatables->select($select_str)->from('communication')
+                ->join('users', 'users.id=communication.created_by', 'inner')
+                ->join('companies', 'companies.id=communication.customer_id', 'left')
+                ->join('warehouses', 'warehouses.id=communication.warehouse_id', 'inner');
+            if ($has_assign_status) {
+                $this->datatables->join('users as assign_users', 'assign_users.id=communication.assign_id', 'left');
+            }
+        }
+
+        // Non-admin/owner: only last 5 days and only records assigned to the logged-in user
+        $comm_table = $this->db->dbprefix('communication');
+        if (!$this->Owner && !$this->Admin) {
+            $this->datatables->where($comm_table . '.date >= DATE_SUB(CURDATE(), INTERVAL 5 DAY)', null, false);
+            if ($has_assign_status) {
+                $this->datatables->where($comm_table . '.assign_id', $this->session->userdata('user_id'));
+            }
+        }
+
         $this->datatables->add_column("Actions", $action, "id");
         echo $this->datatables->generate();
     }
@@ -105,9 +124,10 @@ class Communication extends MY_Controller
         $this->data['error'] = (validation_errors()) ? validation_errors() : $this->session->flashdata('error');
         $inv = $this->communication_model->getCommunicationByID($id);
        
-        $this->data['customer'] = $this->site->getCompanyByID($inv->customer_id);
+        $this->data['customer'] = (!empty($inv->customer_id) && $inv->customer_id) ? $this->site->getCompanyByID($inv->customer_id) : null;
        
         $this->data['created_by'] = $this->site->getUser($inv->created_by);
+        $this->data['assign_to_user'] = !empty($inv->assign_id) ? $this->site->getUser($inv->assign_id) : null;
         $this->data['updated_by'] = $inv->updated_by ? $this->site->getUser($inv->updated_by) : null;
         $this->data['warehouse'] = $this->site->getWarehouseByID($inv->warehouse_id);
         $this->data['inv'] = $inv;
@@ -124,11 +144,14 @@ class Communication extends MY_Controller
     {
         $this->sma->checkPermissions();
        
-        $this->form_validation->set_rules('customer', lang("customer"), 'required');
+        $this->form_validation->set_rules('customer', lang("customer"), 'required|trim');
         $this->form_validation->set_rules('date', lang("Date"), 'required');
+        $this->form_validation->set_rules('reference_no', lang("reference_no"), 'required|trim');
         $this->form_validation->set_rules('warehouse', lang("warehouse"), 'required');
-        
-        $this->form_validation->set_rules('note', lang("note"), 'required');
+        if ($this->communication_model->has_assign_status_columns()) {
+            $this->form_validation->set_rules('assign_id', lang("assign_to"), 'required');
+            $this->form_validation->set_rules('status', lang("status"), 'required');
+        }
        
 
         if ($this->form_validation->run() == true) {
@@ -137,20 +160,24 @@ class Communication extends MY_Controller
           
             $date = $this->sma->fld(trim($this->input->post('date')));
             $warehouse_id = $this->input->post('warehouse');
-            $customer_id = $this->input->post('customer');
-            $customer_details = $this->site->getCompanyByID($customer_id);
-            $customer = $customer_details->name . ' ' .$customer_details->last_name;
+            $customer = $this->sma->clear_tags(trim($this->input->post('customer')));
             $note = $this->sma->clear_tags($this->input->post('note'));
+            $attachment = $this->handle_communication_upload();
             $data = array(
                   'date' => $date,
                   'reference_no' => $reference,
-                  'customer_id' => $customer_id,
                   'customer' => $customer,
                   'warehouse_id' => $warehouse_id,
                   'created_by' => $this->session->userdata('user_id'),
-                
                   'note' => $note,
                   );
+            if ($this->communication_model->has_assign_status_columns()) {
+                $data['assign_id'] = (int) $this->input->post('assign_id');
+                $data['status'] = $this->sma->clear_tags($this->input->post('status'));
+            }
+            if ($attachment !== null) {
+                $data['attachment'] = $attachment;
+            }
            
         }
 
@@ -164,6 +191,10 @@ class Communication extends MY_Controller
             $this->data['error'] = (validation_errors() ? validation_errors() : $this->session->flashdata('error'));
            
             $this->data['warehouses'] = $this->site->getAllWarehouses();
+            $this->data['has_assign_status'] = $this->communication_model->has_assign_status_columns();
+            $this->data['users'] = $this->communication_model->has_assign_status_columns() ? $this->communication_model->getAssignUsers($this->Owner || $this->Admin) : array();
+            $this->data['default_assign_id'] = ($this->Owner || $this->Admin) ? '' : $this->session->userdata('user_id');
+            $this->data['status_options'] = array('New' => 'New', 'In Progress' => 'In Progress', 'Completed' => 'Completed', 'Hold' => 'Hold');
            
             $bc = array(array('link' => base_url(), 'page' => lang('home')), array('link' => admin_url('communication'), 'page' => lang('Communication')), array('link' => '#', 'page' => lang('add')));
             $meta = array('page_title' => lang('add'), 'bc' => $bc);
@@ -183,30 +214,44 @@ class Communication extends MY_Controller
         $inv = $this->communication_model->getCommunicationByID($id);
         
        
-        $this->form_validation->set_rules('customer', lang("customer"), 'required');
+        $this->form_validation->set_rules('customer', lang("customer"), 'required|trim');
           $this->form_validation->set_rules('date', lang("Date"), 'required');
+        $this->form_validation->set_rules('reference_no', lang("reference_no"), 'required|trim');
         $this->form_validation->set_rules('warehouse', lang("warehouse"), 'required');
-        
-        $this->form_validation->set_rules('note', lang("note"), 'required');
+        if ($this->communication_model->has_assign_status_columns()) {
+            $this->form_validation->set_rules('assign_id', lang("assign_to"), 'required');
+            $this->form_validation->set_rules('status', lang("status"), 'required');
+        }
 
         if ($this->form_validation->run() == true) {
             $reference = $this->input->post('reference_no') ? $this->input->post('reference_no') : $this->site->getReference('to');
             $date = $this->sma->fld(trim($this->input->post('date')));
             $warehouse_id = $this->input->post('warehouse');
-            $customer_id = $this->input->post('customer');
-            $customer_details = $this->site->getCompanyByID($customer_id);
-            $customer = $customer_details->name . ' ' .$customer_details->last_name;
+            $customer = $this->sma->clear_tags(trim($this->input->post('customer')));
             $note = $this->sma->clear_tags($this->input->post('note'));
+            $inv = $this->communication_model->getCommunicationByID($id);
+            $attachment = $this->handle_communication_upload($id, !empty($inv->attachment) ? $inv->attachment : null);
             $data = array(
                   'date' => $date,
                   'reference_no' => $reference,
-                  'customer_id' => $customer_id,
                   'customer' => $customer,
                   'warehouse_id' => $warehouse_id,
                   'updated_by' => $this->session->userdata('user_id'),
                   'note' => $note,
                   'updated_at'=>date('Y-m-d H:i:s')
                   );
+            if ($this->communication_model->has_assign_status_columns()) {
+                $data['assign_id'] = (int) $this->input->post('assign_id');
+                $data['status'] = $this->sma->clear_tags($this->input->post('status'));
+            }
+            if ($attachment !== null) {
+                $data['attachment'] = $attachment;
+            } else {
+                $inv = $this->communication_model->getCommunicationByID($id);
+                if (!empty($inv->attachment)) {
+                    $data['attachment'] = $inv->attachment;
+                }
+            }
         }
 
         if ($this->form_validation->run() == true && $this->communication_model->update($id, $data)) {
@@ -220,11 +265,61 @@ class Communication extends MY_Controller
             $this->data['error'] = (validation_errors() ? validation_errors() : $this->session->flashdata('error'));
            
             $this->data['warehouses'] = $this->site->getAllWarehouses();
+            $this->data['has_assign_status'] = $this->communication_model->has_assign_status_columns();
+            $this->data['users'] = $this->communication_model->has_assign_status_columns() ? $this->communication_model->getAssignUsers($this->Owner || $this->Admin) : array();
+            $this->data['status_options'] = array('New' => 'New', 'In Progress' => 'In Progress', 'Completed' => 'Completed', 'Hold' => 'Hold');
            
             $bc = array(array('link' => base_url(), 'page' => lang('home')), array('link' => admin_url('communication'), 'page' => lang('Communication')), array('link' => '#', 'page' => lang('Edit')));
             $meta = array('page_title' => lang('Edit'), 'bc' => $bc);
             $this->page_construct('communication/edit', $meta, $this->data);
         }
+    }
+
+    /**
+     * Handle file upload for communication (video/audio/pdf/doc etc). Returns comma-separated paths or null.
+     * @param int|null $id Communication id for edit (used for unique naming)
+     * @param string|null $existing_attachment Existing attachment paths to append to
+     */
+    protected function handle_communication_upload($id = null, $existing_attachment = null)
+    {
+        $upload_path = FCPATH . 'assets/uploads/communication/';
+        if (!is_dir($upload_path)) {
+            mkdir($upload_path, 0755, true);
+        }
+        $relative_path = 'assets/uploads/communication/';
+        $uploaded = array();
+        if (!empty($existing_attachment)) {
+            $uploaded = array_filter(explode(',', $existing_attachment));
+        }
+        $this->load->library('upload');
+        if (isset($_FILES['attachment']) && is_array($_FILES['attachment']['name'])) {
+            foreach ($_FILES['attachment']['name'] as $key => $name) {
+                if (empty($name) || (isset($_FILES['attachment']['error'][$key]) && $_FILES['attachment']['error'][$key] != 0)) {
+                    continue;
+                }
+                $_FILES['single_file']['name'] = $_FILES['attachment']['name'][$key];
+                $_FILES['single_file']['type'] = $_FILES['attachment']['type'][$key];
+                $_FILES['single_file']['tmp_name'] = $_FILES['attachment']['tmp_name'][$key];
+                $_FILES['single_file']['error'] = $_FILES['attachment']['error'][$key];
+                $_FILES['single_file']['size'] = $_FILES['attachment']['size'][$key];
+                $ext = pathinfo($name, PATHINFO_EXTENSION);
+                $file_name = preg_replace('/[^a-zA-Z0-9_\-.]/', '_', pathinfo($name, PATHINFO_FILENAME)) . '_' . date('Ymd_His') . ($id ? '_' . $id : '') . '.' . $ext;
+                $config = array(
+                    'upload_path' => $upload_path,
+                    'allowed_types' => $this->digital_file_types,
+                    'max_size' => $this->allowed_file_size,
+                    'overwrite' => false,
+                    'file_name' => $file_name,
+                );
+                $this->upload->initialize($config);
+                if ($this->upload->do_upload('single_file')) {
+                    $uploaded[] = $relative_path . $this->upload->data('file_name');
+                } else {
+                    $this->session->set_flashdata('error', $this->upload->display_errors());
+                }
+            }
+        }
+        return empty($uploaded) ? null : implode(',', $uploaded);
     }
 
     /* ------------------------------- */
