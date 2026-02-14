@@ -196,3 +196,104 @@ Year 3 (2027):
 - Savings Year 3: €1,990.49
 
 Total 3- year savings: €5,373.33
+
+________________________________________
+
+# Manual: Adding Historical Tax Data
+
+This guide explains how to manually enter historical tax data for a customer in the system. This feature is useful for recording past tax years (e.g., previous 15 years) to ensure complete records and accurate future calculations.
+
+## Prerequisites
+
+Before adding historical data, ensure:
+1.  **User Permissions**: You must be an **Owner**, **Admin**, or have the `tax_calculations-view` permission.
+2.  **Customer Exists**: The customer must already be created in the system.
+3.  **Tax Settings Configured**: The customer **MUST** have their tax settings (Customer Type, Tax Regime, Coefficient, etc.) configured. If not, you will be redirected to the settings page to configure them first.
+
+## Navigation
+
+1.  Log in to the **Admin Dashboard**.
+2.  Navigate to **Tax Calculations** in the main menu.
+3.  Locate the desired customer in the list.
+4.  Click the **Actions** button (or the cog icon).
+5.  Select **Tax Settings** (`<i class="fa fa-cog"></i>`).
+6.  On the Tax Settings page, look at the top header area.
+7.  Click the blue button labeled **Add Historical Year** (`<i class="fa fa-history"></i>`).
+
+## Data Entry Form
+
+The "Add Historical Year" form is divided into several sections. Fill in the available data for the selected year.
+
+### 1. General Info
+*   **Year**: Select the tax year you are recording. The dropdown shows years from the current year back to 15 years ago.
+    *   *Note*: Years that already have data will be marked with "(already has data)".
+*   **Coefficient Used**: The profitability coefficient used for that year (e.g., 78.00). Pre-filled from current settings but can be adjusted.
+*   **Tax Rate Used**: The tax rate used for that year (e.g., 5.00 or 15.00). Pre-filled from current settings.
+
+### 2. Tax Calculation
+Enter the financial figures for the tax calculation:
+*   **Total Sales**: Gross revenue for the year.
+*   **Taxable Income**: Calculated base for tax.
+*   **Tax Due**: Total tax amount required.
+*   **Advance Payments Made**: Total of advance payments already made for this tax.
+*   **Balance Payment**: Remaining tax to be paid.
+*   **Next Year Advance Base**: Base amount used to calculate next year's advances.
+*   **Previous Year INPS**: INPS amount from the previous year (deductible).
+
+### 3. Tax Payments
+Record the status and amounts of the specific tax payments:
+*   **Balance**: The balance payment for the tax year.
+*   **First Advance**: The first advance payment for the *following* year.
+*   **Second Advance**: The second advance payment for the *following* year.
+    *   For each, enter: **Amount**, **Paid Amount**, **Paid Date**, and **Status** (Pending, Paid, Overdue).
+
+### 4. INPS (Social Security)
+*   **INPS Taxable Income**: Income subject to INPS.
+*   **INPS Amount**: Total INPS due.
+*   **Discount**: If applicable (35% reduction), enter Percentage and Amount.
+*   **INPS Payments**:
+    *   Enter details for the 3 installments (Gestione Separata) or 4 installments (Commercianti/Artigiani).
+    *   Fields: **Amount**, **Paid Amount**, **Paid Date**, **Status**.
+
+### 5. INAIL (Workplace Insurance)
+*   *Visible only for **Artigiani** customer type.*
+*   **Fields**: INAIL Taxable Income, Final Amount.
+*   **Payment**: Amount, Paid Amount, Paid Date, Status.
+
+### 6. Diritto Annuale (Chamber of Commerce Fee)
+*   *Visible only for **Artigiani** and **Commercianti**.*
+*   **Fields**: Amount, Paid Amount, Paid Date, Status.
+
+### 7. Fattura tra privati (Optional)
+*   Optional section for private invoice calculations.
+*   **Fields**: Total Invoices, Total Sales Amount, Total Payment Amount, Paid Amount, Paid Date, Status.
+
+## Saving
+
+1.  Review all entered data for accuracy.
+2.  Click the **Save Historical Year** button at the bottom of the form.
+3.  Upon success, you will be redirected to the **View Tax Calculation** page for that year, where you can verify the saved data.
+
+## Entering Previous Year Data (Crucial for Current Year)
+
+It is highly recommended to enter the **immediately preceding year's data** before calculating the current year's taxes.
+*   *Example*: If you are working on the **2026** tax calculation, you should first manually enter the history for **2025**.
+*   **Why?**: The system uses the previous year's **Taxable Income** and **Tax Due** to automatically calculate the **Advance Payments (Acconti)** for the current year.
+
+**Steps for Previous Year Entry:**
+1.  Follow the [Navigation](#navigation) steps above.
+2.  In the **Year** dropdown, select the year immediately before the current one (e.g., if today is 2026, select 2025).
+3.  Fill in the **Tax Calculation** fields carefully, especially:
+    *   **Tax Due**: This figure determines the advance payments for the following year.
+    *   **Next Year Advance Base**: This is often the same as the taxable income or tax due, used as the basis for next year's forecasts.
+4.  **Save** the data.
+5.  Now, when you go to calculate taxes for the *current* year, the system will accurately project the advance payments based on this historical record.
+
+## Editing Historical Data
+
+To edit previously entered historical data:
+1.  Navigate to **Tax Calculations**.
+2.  Click **View** for the customer.
+3.  Use the year selector to find the historical year.
+4.  (Note: If specific edit functionality is restricted, you may need to contact an administrator or update specific payments via the "Update Payment" features in the view).
+
