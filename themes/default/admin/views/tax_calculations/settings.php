@@ -1,12 +1,93 @@
 <?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
 <?php $attrib = array('data-toggle' => 'validator', 'role' => 'form', 'id' => 'tax-settings-form');
 echo admin_form_open_multipart("tax_calculations/settings?customer_id=" . $customer->id, $attrib); ?>
-<div class="box">
+<style>
+.tax-settings-header .box-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    min-height: 40px;
+    padding-right: 15px;
+}
+.tax-settings-header .box-header h2 {
+    margin: 0 0 0 20px;
+    padding: 10px 0;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+.tax-settings-header .box-header h2 i {
+    margin: 0 12px 0 0;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-right: none;
+    font-size: 18px;
+}
+.tax-settings-header .box-header h2 i.fa-fw {
+    text-align: center;
+}
+.tax-settings-header .box-header .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-left: 12px;
+    flex-shrink: 0;
+}
+.tax-settings-header .header-actions .btn {
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 3px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.tax-settings-header .header-actions .btn-primary-action {
+    background: #2980b9;
+    color: #fff;
+    border: 1px solid #2471a3;
+}
+.tax-settings-header .header-actions .btn-primary-action:hover {
+    background: #2471a3;
+    color: #fff;
+    border-color: #1c5d87;
+}
+.tax-settings-header .header-actions .btn-secondary-action {
+    background: #fff;
+    color: #555;
+    border: 1px solid #ccc;
+}
+.tax-settings-header .header-actions .btn-secondary-action:hover {
+    background: #f5f5f5;
+    color: #333;
+    border-color: #adadad;
+}
+.tax-settings-header .header-actions .btn + .btn {
+    margin-left: 8px;
+}
+</style>
+<div class="box tax-settings-header">
     <div class="box-header">
         <h2 class="blue">
-            <i class="fa-fw fa fa-cog"></i><?= lang('tax_settings'); ?> -
+            <i class="fa-fw fa fa-cog"></i><?= lang('tax_settings'); ?> —
             <?= $customer->name . ' ' . ($customer->last_name ? $customer->last_name : '') . ' (' . $customer->company . ')'; ?>
         </h2>
+        <div class="header-actions">
+            <a href="<?= admin_url('tax_calculations/historical_year?customer_id=' . $customer->id) ?>" class="btn btn-primary-action">
+                <i class="fa fa-history"></i> <?= lang('add_historical_year'); ?>
+            </a>
+            <a href="<?= admin_url('tax_calculations/view?customer_id=' . $customer->id) ?>" class="btn btn-secondary-action">
+                <i class="fa fa-eye"></i> <?= lang('view_tax_calculation'); ?>
+            </a>
+        </div>
     </div>
     <div class="box-content">
         <div class="row">

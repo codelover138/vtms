@@ -987,6 +987,312 @@ class Tax_calculations_model extends CI_Model
     }
 
     /**
+     * Validate that customer has required tax settings to add historical year or run calculations.
+     */
+    public function validateCustomerHasTaxSettings($customer_id)
+    {
+        $customer = $this->getCustomerTaxSettings($customer_id);
+        if (!$customer) {
+            return false;
+        }
+        if (empty($customer->customer_type)) {
+            return false;
+        }
+        if ($customer->coefficient_of_profitability === null || $customer->coefficient_of_profitability === '') {
+            return false;
+        }
+        if ($customer->tax_rate === null || $customer->tax_rate === '') {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Save historical year data (manual entry for past years). All customer types supported.
+     * @param int $customer_id
+     * @param int $year
+     * @param object $customer Company row
+     * @param array $post POST data from form
+     * @return true|string TRUE on success, error message string on failure
+     */
+    public function saveHistoricalYear($customer_id, $year, $customer, $post)
+    {
+        $coefficient = isset($post['coefficient_used']) ? (float)$post['coefficient_used'] : ($customer->coefficient_of_profitability ? (float)$customer->coefficient_of_profitability : 78);
+        $tax_rate = isset($post['tax_rate_used']) ? (float)$post['tax_rate_used'] : ($customer->tax_rate ? (float)$customer->tax_rate : 5);
+        $total_sales = (float)$this->input_float($post, 'total_sales', 0);
+        $taxable_income = (float)$this->input_float($post, 'taxable_income', 0);
+        $tax_due = (float)$this->input_float($post, 'tax_due', 0);
+        $advance_payments_made = (float)$this->input_float($post, 'advance_payments_made', 0);
+        $balance_payment = (float)$this->input_float($post, 'balance_payment', 0);
+        $next_year_advance_base = (float)$this->input_float($post, 'next_year_advance_base', 0);
+        $previous_year_inps = (float)$this->input_float($post, 'previous_year_inps', 0);
+
+        $tax_data = array(
+            'customer_id' => $customer_id,
+            'tax_year' => $year,
+            'total_sales' => $total_sales,
+            'previous_year_inps' => $previous_year_inps,
+            'taxable_income' => $taxable_income,
+            'tax_due' => $tax_due,
+            'advance_payments_made' => $advance_payments_made,
+            'balance_payment' => $balance_payment,
+            'next_year_advance_base' => $next_year_advance_base,
+            'coefficient_used' => $coefficient,
+            'tax_rate_used' => $tax_rate
+        );
+        $this->saveTaxCalculation($tax_data);
+        $tax_calc = $this->getTaxCalculation($customer_id, $year);
+        if (!$tax_calc) {
+            return 'Failed to save tax calculation.';
+        }
+
+        $customer_type = $customer->customer_type ? $customer->customer_type : '';
+
+        // Tax payments: balance (year), first_advance (year+1), second_advance (year+1)
+        $tax_payments_config = array(
+            array('payment_type' => 'balance', 'payment_year' => $year, 'due_date' => ($year + 1) . '-02-16'),
+            array('payment_type' => 'first_advance', 'payment_year' => $year + 1, 'due_date' => ($year + 1) . '-06-30'),
+            array('payment_type' => 'second_advance', 'payment_year' => $year + 1, 'due_date' => ($year + 1) . '-11-30')
+        );
+        foreach ($tax_payments_config as $i => $cfg) {
+            $key = $cfg['payment_type'];
+            $amount = (float)$this->input_float($post, 'tax_' . $key . '_amount', 0);
+            $paid_amount = (float)$this->input_float($post, 'tax_' . $key . '_paid_amount', 0);
+            $paid_date = $this->input_post($post, 'tax_' . $key . '_paid_date');
+            $status = $this->input_post($post, 'tax_' . $key . '_status');
+            if ($status !== 'paid' && $status !== 'overdue') {
+                $status = 'pending';
+            }
+            $payment = array(
+                'customer_id' => $customer_id,
+                'tax_calculation_id' => $tax_calc->id,
+                'payment_type' => $cfg['payment_type'],
+                'payment_year' => $cfg['payment_year'],
+                'due_date' => $cfg['due_date'],
+                'amount' => $amount,
+                'paid_amount' => $paid_amount,
+                'paid_date' => ($paid_date && $paid_date !== '') ? $paid_date : null,
+                'status' => $status
+            );
+            $existing = $this->db->get_where('tax_payments', array(
+                'customer_id' => $customer_id,
+                'payment_type' => $cfg['payment_type'],
+                'payment_year' => $cfg['payment_year']
+            ), 1);
+            if ($existing->num_rows() > 0) {
+                $this->db->where('customer_id', $customer_id);
+                $this->db->where('payment_type', $cfg['payment_type']);
+                $this->db->where('payment_year', $cfg['payment_year']);
+                $this->db->update('tax_payments', $payment);
+            } else {
+                $this->db->insert('tax_payments', $payment);
+            }
+        }
+
+        // INPS calculation
+        $inps_taxable_income = (float)$this->input_float($post, 'inps_taxable_income', $taxable_income);
+        $inps_amount_after_discount = (float)$this->input_float($post, 'inps_amount_after_discount', 0);
+        $inps_amount = (float)$this->input_float($post, 'inps_amount', $inps_amount_after_discount);
+        $inps_discount_pct = (float)$this->input_float($post, 'inps_discount_percentage', 0);
+        $inps_discount_amt = (float)$this->input_float($post, 'inps_discount_amount', 0);
+        $inps_data = array(
+            'customer_id' => $customer_id,
+            'tax_year' => $year,
+            'taxable_income' => $inps_taxable_income,
+            'inps_rate' => $inps_amount_after_discount > 0 && $inps_taxable_income > 0 ? round(($inps_amount_after_discount / $inps_taxable_income) * 100, 2) : 0,
+            'inps_amount' => $inps_amount,
+            'discount_percentage' => $inps_discount_pct,
+            'discount_amount' => $inps_discount_amt,
+            'inps_amount_after_discount' => $inps_amount_after_discount
+        );
+        $this->saveINPSCalculation($inps_data);
+        $inps_calc = $this->db->get_where('inps_calculations', array('customer_id' => $customer_id, 'tax_year' => $year), 1)->row();
+        if ($inps_calc) {
+            $num_installments = ($customer_type === 'Gestione Separata') ? 3 : 4;
+            $due_dates_gs = array(($year + 1) . '-06-30', ($year + 1) . '-06-30', ($year + 1) . '-11-30');
+            $due_dates_4 = array($year . '-05-16', $year . '-08-20', $year . '-11-16', ($year + 1) . '-02-16');
+            $due_dates = ($customer_type === 'Gestione Separata') ? $due_dates_gs : $due_dates_4;
+            $notes_gs = array('Saldo INPS', '1° Acconto INPS', '2° Acconto INPS');
+            $notes_4 = array('1° Rata INPS', '2° Rata INPS', '3° Rata INPS', '4° Rata INPS');
+            $notes = ($customer_type === 'Gestione Separata') ? $notes_gs : $notes_4;
+            for ($n = 1; $n <= $num_installments; $n++) {
+                $amount = (float)$this->input_float($post, 'inps_installment_' . $n . '_amount', 0);
+                $paid_amount = (float)$this->input_float($post, 'inps_installment_' . $n . '_paid_amount', 0);
+                $paid_date = $this->input_post($post, 'inps_installment_' . $n . '_paid_date');
+                $status = $this->input_post($post, 'inps_installment_' . $n . '_status');
+                $status = (strtoupper($status) === 'PAID') ? 'PAID' : ((strtoupper($status) === 'OVERDUE') ? 'OVERDUE' : 'PENDING');
+                $payment = array(
+                    'customer_id' => $customer_id,
+                    'inps_calculation_id' => $inps_calc->id,
+                    'installment_number' => $n,
+                    'payment_year' => $year,
+                    'due_date' => isset($due_dates[$n - 1]) ? $due_dates[$n - 1] : ($year + 1) . '-02-16',
+                    'amount' => $amount,
+                    'paid_amount' => $paid_amount,
+                    'paid_date' => ($paid_date && $paid_date !== '') ? $paid_date : null,
+                    'status' => $status,
+                    'notes' => isset($notes[$n - 1]) ? $notes[$n - 1] : ''
+                );
+                $existing = $this->db->get_where('inps_payments', array(
+                    'customer_id' => $customer_id,
+                    'installment_number' => $n,
+                    'payment_year' => $year
+                ), 1);
+                if ($existing->num_rows() > 0) {
+                    $this->db->where('customer_id', $customer_id);
+                    $this->db->where('installment_number', $n);
+                    $this->db->where('payment_year', $year);
+                    $this->db->update('inps_payments', $payment);
+                } else {
+                    $this->db->insert('inps_payments', $payment);
+                }
+            }
+        }
+
+        // INAIL (Artigiani only)
+        if ($customer_type === 'Artigiani') {
+            $inail_taxable_income = (float)$this->input_float($post, 'inail_taxable_income', $taxable_income);
+            $inail_final_amount = (float)$this->input_float($post, 'inail_final_amount', 0);
+            $inail_coef = $customer->inail_coefficient ? (float)$customer->inail_coefficient : 65;
+            $inail_base = $inail_taxable_income * $inail_coef / 100;
+            $inail_rate = $customer->inail_rate ? (float)$customer->inail_rate : 5;
+            $inail_calc_amt = $inail_base * $inail_rate / 100;
+            $inail_min = $customer->inail_minimum_payment ? (float)$customer->inail_minimum_payment : 210;
+            $inail_final = $inail_final_amount > 0 ? $inail_final_amount : max($inail_calc_amt, $inail_min);
+            $inail_data = array(
+                'customer_id' => $customer_id,
+                'tax_year' => $year,
+                'taxable_income' => $inail_taxable_income,
+                'inail_coefficient' => $inail_coef,
+                'inail_base_amount' => $inail_base,
+                'inail_rate' => $inail_rate,
+                'inail_calculated_amount' => $inail_calc_amt,
+                'inail_minimum_payment' => $inail_min,
+                'inail_final_amount' => $inail_final,
+                'ateco_code' => $customer->inail_ateco_code ? $customer->inail_ateco_code : null
+            );
+            $this->saveINAILCalculation($inail_data);
+            $inail_calc = $this->db->get_where('inail_calculations', array('customer_id' => $customer_id, 'tax_year' => $year), 1)->row();
+            if ($inail_calc) {
+                $inail_amount = (float)$this->input_float($post, 'inail_payment_amount', $inail_final);
+                $inail_paid = (float)$this->input_float($post, 'inail_payment_paid_amount', 0);
+                $inail_paid_date = $this->input_post($post, 'inail_payment_paid_date');
+                $inail_status = $this->input_post($post, 'inail_payment_status');
+                if ($inail_status !== 'paid' && $inail_status !== 'overdue') {
+                    $inail_status = 'pending';
+                }
+                $inail_payment = array(
+                    'customer_id' => $customer_id,
+                    'inail_calculation_id' => $inail_calc->id,
+                    'payment_year' => $year,
+                    'due_date' => ($year + 1) . '-02-16',
+                    'amount' => $inail_amount,
+                    'paid_amount' => $inail_paid,
+                    'paid_date' => ($inail_paid_date && $inail_paid_date !== '') ? $inail_paid_date : null,
+                    'status' => $inail_status
+                );
+                $existing = $this->db->get_where('inail_payments', array('customer_id' => $customer_id, 'payment_year' => $year), 1);
+                if ($existing->num_rows() > 0) {
+                    $this->db->where('customer_id', $customer_id);
+                    $this->db->where('payment_year', $year);
+                    $this->db->update('inail_payments', $inail_payment);
+                } else {
+                    $this->db->insert('inail_payments', $inail_payment);
+                }
+            }
+        }
+
+        // Diritto Annuale (Artigiani and Commercianti)
+        if (in_array($customer_type, array('Artigiani', 'Commercianti'))) {
+            $diritto_amount = (float)$this->input_float($post, 'diritto_annuale_amount', 0);
+            if ($diritto_amount > 0) {
+                $diritto_paid = (float)$this->input_float($post, 'diritto_annuale_paid_amount', 0);
+                $diritto_paid_date = $this->input_post($post, 'diritto_annuale_paid_date');
+                $diritto_status = $this->input_post($post, 'diritto_annuale_status');
+                if ($diritto_status !== 'paid' && $diritto_status !== 'overdue') {
+                    $diritto_status = 'pending';
+                }
+                $due_date = $year . '-03-31';
+                $payment_data = array(
+                    'customer_id' => $customer_id,
+                    'payment_year' => $year,
+                    'due_date' => $due_date,
+                    'amount' => $diritto_amount,
+                    'paid_amount' => $diritto_paid,
+                    'paid_date' => ($diritto_paid_date && $diritto_paid_date !== '') ? $diritto_paid_date : null,
+                    'status' => $diritto_status
+                );
+                $existing = $this->db->get_where('diritto_annuale_payments', array('customer_id' => $customer_id, 'payment_year' => $year), 1);
+                if ($existing->num_rows() > 0) {
+                    $this->db->where('customer_id', $customer_id);
+                    $this->db->where('payment_year', $year);
+                    $this->db->update('diritto_annuale_payments', $payment_data);
+                } else {
+                    $this->db->insert('diritto_annuale_payments', $payment_data);
+                }
+            }
+        }
+
+        // Fattura tra privati (optional)
+        $ftp_total_invoices = (int)$this->input_float($post, 'fattura_total_invoices', 0);
+        $ftp_total_amount = (float)$this->input_float($post, 'fattura_total_payment_amount', 0);
+        if ($ftp_total_invoices > 0 && $ftp_total_amount > 0) {
+            $ftp_data = array(
+                'customer_id' => $customer_id,
+                'tax_year' => $year,
+                'total_invoices' => $ftp_total_invoices,
+                'total_sales_amount' => (float)$this->input_float($post, 'fattura_total_sales_amount', 0),
+                'payment_per_invoice' => 2.00,
+                'total_payment_amount' => $ftp_total_amount,
+                'minimum_invoice_amount' => 77.47
+            );
+            $this->saveFatturaTraPrivatiCalculation($ftp_data);
+            $ftp_calc = $this->db->get_where('fattura_tra_privati_calculations', array('customer_id' => $customer_id, 'tax_year' => $year), 1)->row();
+            if ($ftp_calc) {
+                $ftp_paid = (float)$this->input_float($post, 'fattura_paid_amount', 0);
+                $ftp_paid_date = $this->input_post($post, 'fattura_paid_date');
+                $ftp_status = $this->input_post($post, 'fattura_status');
+                if ($ftp_status !== 'paid' && $ftp_status !== 'overdue') {
+                    $ftp_status = 'pending';
+                }
+                $ftp_payment = array(
+                    'customer_id' => $customer_id,
+                    'fattura_tra_privati_calculation_id' => $ftp_calc->id,
+                    'payment_year' => $year,
+                    'due_date' => ($year + 1) . '-02-16',
+                    'amount' => $ftp_total_amount,
+                    'paid_amount' => $ftp_paid,
+                    'paid_date' => ($ftp_paid_date && $ftp_paid_date !== '') ? $ftp_paid_date : null,
+                    'status' => $ftp_status
+                );
+                $existing = $this->db->get_where('fattura_tra_privati_payments', array('customer_id' => $customer_id, 'payment_year' => $year), 1);
+                if ($existing->num_rows() > 0) {
+                    $this->db->where('customer_id', $customer_id);
+                    $this->db->where('payment_year', $year);
+                    $this->db->update('fattura_tra_privati_payments', $ftp_payment);
+                } else {
+                    $this->db->insert('fattura_tra_privati_payments', $ftp_payment);
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private function input_float($post, $key, $default = 0)
+    {
+        if (!isset($post[$key]) || $post[$key] === '') {
+            return $default;
+        }
+        return is_numeric($post[$key]) ? (float)$post[$key] : $default;
+    }
+
+    private function input_post($post, $key)
+    {
+        return isset($post[$key]) ? trim((string)$post[$key]) : '';
+    }
+
+    /**
      * Process tax calculation for a customer for a year
      * This is the main method that orchestrates the entire calculation
      */

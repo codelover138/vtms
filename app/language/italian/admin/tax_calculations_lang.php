@@ -271,6 +271,19 @@ $lang['payment_not_found']                                 = "Pagamento non trov
 $lang['please_select_pdf']                                 = "Seleziona un file PDF.";
 $lang['request_failed']                                    = "Richiesta fallita.";
 
+// Historical year
+$lang['add_historical_year']                               = "Aggiungi Anno Storico";
+$lang['add_historical_year_intro']                         = "Inserisci i dati fiscali e di pagamento per un anno passato (già calcolati/pagati fuori dal sistema). Assicurati che le impostazioni fiscali del cliente siano configurate prima.";
+$lang['already_has_data']                                  = "ha già dati";
+$lang['save_historical_year']                              = "Salva Anno Storico";
+$lang['historical_year_saved']                             = "Dati anno storico salvati con successo.";
+$lang['historical_year_save_failed']                       = "Impossibile salvare i dati dell'anno storico.";
+$lang['historical_year_settings_required']                 = "Configura le impostazioni fiscali per questo cliente (tipo cliente, coefficiente, aliquota) prima di aggiungere anni storici.";
+$lang['installments']                                     = "Rate";
+$lang['inail_payment']                                     = "Pagamento INAIL";
+$lang['total_sales_amount']                                = "Importo Vendite Totali";
+$lang['total_payment_amount']                              = "Importo Pagamento Totale";
+
 // Service point (user dashboard)
 $lang['service_point']                                     = "Punto di servizio";
 $lang['service_point_transfers']                           = "Trasferimenti punto di servizio";

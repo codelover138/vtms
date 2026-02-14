@@ -363,6 +363,96 @@ class Tax_calculations extends MY_Controller
     }
 
     /**
+     * Add historical year form. Requires customer_id and that customer has tax settings configured.
+     */
+    public function historical_year()
+    {
+        $this->sma->checkPermissions('view');
+
+        $customer_id = (int) $this->input->get('customer_id');
+        if (!$customer_id) {
+            $this->session->set_flashdata('error', lang('customer_not_found'));
+            admin_redirect('tax_calculations');
+            return;
+        }
+
+        $customer = $this->site->getCompanyByID($customer_id);
+        if (!$customer) {
+            $this->session->set_flashdata('error', lang('customer_not_found'));
+            admin_redirect('tax_calculations');
+            return;
+        }
+
+        if (!$this->tax_calculations_model->validateCustomerHasTaxSettings($customer_id)) {
+            $this->session->set_flashdata('error', lang('historical_year_settings_required'));
+            admin_redirect('tax_calculations/settings?customer_id=' . $customer_id);
+            return;
+        }
+
+        $existing_years = $this->tax_calculations_model->getAllTaxCalculations($customer_id);
+        $existing_year_list = array();
+        foreach ($existing_years as $c) {
+            $existing_year_list[] = $c->tax_year;
+        }
+
+        $this->data['customer'] = $customer;
+        $this->data['existing_year_list'] = $existing_year_list;
+        $this->data['customer_type'] = $customer->customer_type ? $customer->customer_type : '';
+        $this->data['is_artigiani'] = ($customer->customer_type === 'Artigiani');
+        $this->data['is_commercianti_artigiani'] = in_array($customer->customer_type, array('Artigiani', 'Commercianti'));
+        $this->data['gestione_separata'] = ($customer->customer_type === 'Gestione Separata');
+
+        $bc = [
+            ['link' => base_url(), 'page' => lang('home')],
+            ['link' => admin_url('tax_calculations'), 'page' => lang('tax_calculations')],
+            ['link' => admin_url('tax_calculations/settings?customer_id=' . $customer_id), 'page' => lang('tax_settings')],
+            ['link' => '#', 'page' => lang('add_historical_year')]
+        ];
+        $meta = ['page_title' => lang('add_historical_year'), 'bc' => $bc];
+        $this->page_construct('tax_calculations/historical_year', $meta, $this->data);
+    }
+
+    /**
+     * Save historical year data (POST).
+     */
+    public function save_historical_year()
+    {
+        $this->sma->checkPermissions('edit', true);
+
+        $customer_id = (int) $this->input->post('customer_id');
+        $year = (int) $this->input->post('year');
+
+        if (!$customer_id || !$year) {
+            $this->session->set_flashdata('error', lang('invalid_request'));
+            admin_redirect('tax_calculations');
+            return;
+        }
+
+        $customer = $this->site->getCompanyByID($customer_id);
+        if (!$customer) {
+            $this->session->set_flashdata('error', lang('customer_not_found'));
+            admin_redirect('tax_calculations');
+            return;
+        }
+
+        if (!$this->tax_calculations_model->validateCustomerHasTaxSettings($customer_id)) {
+            $this->session->set_flashdata('error', lang('historical_year_settings_required'));
+            admin_redirect('tax_calculations/settings?customer_id=' . $customer_id);
+            return;
+        }
+
+        $result = $this->tax_calculations_model->saveHistoricalYear($customer_id, $year, $customer, $this->input->post());
+        if ($result === true) {
+            $this->session->set_flashdata('message', lang('historical_year_saved'));
+            admin_redirect('tax_calculations/view?customer_id=' . $customer_id . '&year=' . $year);
+            return;
+        }
+
+        $this->session->set_flashdata('error', is_string($result) ? $result : lang('historical_year_save_failed'));
+        admin_redirect('tax_calculations/historical_year?customer_id=' . $customer_id);
+    }
+
+    /**
      * Get tax calculation data via AJAX
      */
     public function getTaxCalculation()

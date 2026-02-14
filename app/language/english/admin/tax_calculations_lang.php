@@ -269,6 +269,19 @@ $lang['payment_not_found']                                 = "Payment not found.
 $lang['please_select_pdf']                                 = "Please select a PDF file.";
 $lang['request_failed']                                     = "Request failed.";
 
+// Historical year
+$lang['add_historical_year']                               = "Add Historical Year";
+$lang['add_historical_year_intro']                         = "Enter tax and payment data for a past year (already calculated/paid outside the system). Ensure customer tax settings are configured first.";
+$lang['already_has_data']                                  = "already has data";
+$lang['save_historical_year']                              = "Save Historical Year";
+$lang['historical_year_saved']                             = "Historical year data saved successfully.";
+$lang['historical_year_save_failed']                       = "Failed to save historical year data.";
+$lang['historical_year_settings_required']                 = "Please configure tax settings for this customer (customer type, coefficient, tax rate) before adding historical years.";
+$lang['installments']                                     = "Installments";
+$lang['inail_payment']                                     = "INAIL Payment";
+$lang['total_sales_amount']                                = "Total Sales Amount";
+$lang['total_payment_amount']                              = "Total Payment Amount";
+
 // Service point (user dashboard)
 $lang['service_point']                                     = "Service Point";
 $lang['service_point_transfers']                           = "Service Point Transfers";
