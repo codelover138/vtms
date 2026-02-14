@@ -76,6 +76,20 @@ $(document).ready(function() {
             }, 300);
         }, 500);
     }
+
+    // PDF Download (annual tax report) - same behaviour as admin
+    $('.download-pdf').click(function(e) {
+        e.preventDefault();
+        var url = $(this).data('url');
+        if (!url) return;
+        var iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = url;
+        document.body.appendChild(iframe);
+        setTimeout(function() {
+            if (iframe.parentNode) document.body.removeChild(iframe);
+        }, 5000);
+    });
 });
 </script>
 
@@ -168,6 +182,16 @@ $(document).ready(function() {
             <?php endfor; ?>
             </select>
         </div>
+        <?php if (isset($tax_calculation) && $tax_calculation): ?>
+        <!-- Annual Tax Report PDF Download (same as admin tax_calculations/view) -->
+        <div style="display: flex; align-items: center;">
+            <a href="#" class="btn btn-success btn-sm download-pdf" style="white-space: nowrap;"
+                data-url="<?= site_url('annual_tax_report_pdf?year=' . (int)$tax_year) ?>"
+                title="<?= lang('download_conto_economico_pdf') ?>">
+                <i class="fa fa-file-pdf-o"></i> <?= lang('annual_tax_report_pdf') ?>
+            </a>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- Service point notice (when not assigned) -->
@@ -361,6 +385,13 @@ $(document).ready(function() {
             
             if ($display_calc): 
             ?>
+            <div style="margin-bottom: 15px;">
+                <a href="#" class="btn btn-success btn-sm download-pdf"
+                    data-url="<?= site_url('annual_tax_report_pdf?year=' . (int)$tax_year) ?>"
+                    title="<?= lang('download_conto_economico_pdf') ?>">
+                    <i class="fa fa-file-pdf-o"></i> <?= lang('annual_tax_report_pdf') ?>
+                </a>
+            </div>
             <div class="info-grid">
                 <div class="info-card">
                     <div class="info-card-label"><?= lang('total_sales') ?></div>
@@ -661,6 +692,9 @@ $(document).ready(function() {
                 </div>
                 <div class="payment-amount"><?= $this->sma->formatMoney($payment->amount) ?></div>
                 <span class="payment-status overdue"><?= lang('overdue') ?></span>
+                <?php if (!empty($payment->uploaded_pdf)): ?>
+                <a href="<?= site_url('download_payment_pdf/' . $payment->id . '/' . (isset($payment->payment_type_slug) ? $payment->payment_type_slug : 'tax')) ?>" class="btn btn-xs btn-default" style="margin-left:8px;" title="<?= lang('download') ?> PDF"><i class="fa fa-file-pdf-o"></i> PDF</a>
+                <?php endif; ?>
             </div>
             <?php endforeach; ?>
         </div>
@@ -693,6 +727,9 @@ $(document).ready(function() {
                 </div>
                 <div class="payment-amount"><?= $this->sma->formatMoney($payment->amount) ?></div>
                 <span class="payment-status pending"><?= lang('pending') ?></span>
+                <?php if (!empty($payment->uploaded_pdf)): ?>
+                <a href="<?= site_url('download_payment_pdf/' . $payment->id . '/' . (isset($payment->payment_type_slug) ? $payment->payment_type_slug : 'tax')) ?>" class="btn btn-xs btn-default" style="margin-left:8px;" title="<?= lang('download') ?> PDF"><i class="fa fa-file-pdf-o"></i> PDF</a>
+                <?php endif; ?>
             </div>
             <?php endforeach; ?>
         </div>
@@ -727,6 +764,9 @@ $(document).ready(function() {
                 </div>
                 <div class="payment-amount"><?= $this->sma->formatMoney($payment->paid_amount ? $payment->paid_amount : $payment->amount) ?></div>
                 <span class="payment-status paid"><?= lang('paid') ?></span>
+                <?php if (!empty($payment->uploaded_pdf)): ?>
+                <a href="<?= site_url('download_payment_pdf/' . $payment->id . '/' . (isset($payment->payment_type_slug) ? $payment->payment_type_slug : 'tax')) ?>" class="btn btn-xs btn-default" style="margin-left:8px;" title="<?= lang('download') ?> PDF"><i class="fa fa-file-pdf-o"></i> PDF</a>
+                <?php endif; ?>
             </div>
             <?php endforeach; ?>
             <?php if (count($paid_payments) > 10): ?>

@@ -259,6 +259,15 @@ $lang['based_on_ateco_code']                               = "In base al codice 
 $lang['based_on_profitability']                            = "In base alla redditività";
 $lang['redditivita']                                       = "redditività";
 $lang['download_conto_economico_pdf']                      = "Download Conto Economico PDF";
+$lang['no_pdf_uploaded_for_this_payment']                  = "No PDF uploaded for this payment.";
+$lang['pdf_uploaded_successfully']                         = "PDF uploaded successfully.";
+$lang['upload_payment_pdf']                                = "Upload PDF";
+$lang['upload_pdf']                                        = "Upload PDF";
+$lang['choose_file']                                       = "Choose file";
+$lang['file_not_found']                                    = "File not found.";
+$lang['payment_not_found']                                 = "Payment not found.";
+$lang['please_select_pdf']                                 = "Please select a PDF file.";
+$lang['request_failed']                                     = "Request failed.";
 
 // Service point (user dashboard)
 $lang['service_point']                                     = "Service Point";

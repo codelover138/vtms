@@ -1,4 +1,81 @@
 <?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
+<style>
+.payment-pdf-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.payment-pdf-actions .file-input-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+.payment-pdf-actions input.input-file-pdf {
+    position: absolute;
+    width: 0.1px;
+    height: 0.1px;
+    opacity: 0;
+    overflow: hidden;
+    z-index: -1;
+}
+.payment-pdf-actions .btn-file-label {
+    display: inline-block;
+    padding: 5px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #555;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 0;
+    transition: background 0.2s, border-color 0.2s;
+}
+.payment-pdf-actions .btn-file-label:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+.payment-pdf-actions .file-name {
+    font-size: 11px;
+    color: #6c757d;
+    max-width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-left: 4px;
+}
+.payment-pdf-actions .btn-upload-pdf {
+    padding: 5px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    border-radius: 4px;
+    border: 1px solid #28a745;
+    color: #28a745;
+    background: #fff;
+    transition: background 0.2s, color 0.2s;
+}
+.payment-pdf-actions .btn-upload-pdf:hover {
+    background: #28a745;
+    color: #fff;
+    border-color: #28a745;
+}
+.payment-pdf-actions .btn-download-pdf {
+    padding: 5px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    border-radius: 4px;
+    background: #dc3545;
+    border: 1px solid #dc3545;
+    color: #fff;
+    transition: background 0.2s, border-color 0.2s;
+}
+.payment-pdf-actions .btn-download-pdf:hover {
+    background: #c82333;
+    border-color: #bd2130;
+    color: #fff;
+}
+</style>
 <script>
 $(document).ready(function() {
     $('#year-selector').change(function() {
@@ -225,6 +302,48 @@ $(document).ready(function() {
             document.body.removeChild(iframe);
         }, 5000);
     });
+
+    // Show selected filename next to Choose file
+    $('.payment-pdf-actions .input-file-pdf').on('change', function() {
+        var name = $(this).val().split(/\\|\//).pop() || '';
+        $(this).siblings('.file-name').text(name ? (name.length > 12 ? name.substring(0, 10) + '…' : name) : '');
+    });
+
+    // Upload payment PDF (AJAX)
+    $('.upload-payment-pdf-form').on('submit', function(e) {
+        e.preventDefault();
+        var form = $(this);
+        var paymentId = form.data('payment-id');
+        var paymentType = form.data('payment-type');
+        var fileInput = form.find('input[type="file"]')[0];
+        if (!fileInput || !fileInput.files || !fileInput.files.length) {
+            bootbox.alert('<?= lang("please_select_pdf") ?>');
+            return;
+        }
+        var fd = new FormData();
+        fd.append('payment_id', paymentId);
+        fd.append('payment_type', paymentType);
+        fd.append('payment_pdf', fileInput.files[0]);
+        fd.append('<?= $this->security->get_csrf_token_name() ?>', '<?= $this->security->get_csrf_hash() ?>');
+        $.ajax({
+            url: '<?= admin_url('tax_calculations/upload_payment_pdf') ?>',
+            type: 'POST',
+            data: fd,
+            processData: false,
+            contentType: false,
+            dataType: 'json',
+            success: function(res) {
+                if (res.error == 0) {
+                    bootbox.alert(res.msg, function() { location.reload(); });
+                } else {
+                    bootbox.alert(res.msg || '<?= lang("error") ?>');
+                }
+            },
+            error: function() {
+                bootbox.alert('<?= lang("request_failed") ?>');
+            }
+        });
+    });
 });
 </script>
 <div class="box">
@@ -406,10 +525,24 @@ $(document).ready(function() {
                                                     data-status="<?= $payment->status ?>">
                                                     <i class="fa fa-edit"></i> <?= lang('edit') ?>
                                                 </a>
-                                                <a href="#" class="btn btn-xs btn-danger download-pdf"
-                                                    data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/tax') ?>">
-                                                    <i class="fa fa-file-pdf-o"></i> PDF
-                                                </a>
+                                                <?php if (!empty($can_download_payment_pdf)): ?>
+                                                <div class="payment-pdf-actions">
+                                                    <form class="upload-payment-pdf-form" data-payment-id="<?= $payment->id ?>" data-payment-type="tax">
+                                                        <span class="file-input-wrap">
+                                                            <input type="file" name="payment_pdf" accept=".pdf" class="input-file-pdf" id="pdf-file-tax-<?= $payment->id ?>">
+                                                            <label for="pdf-file-tax-<?= $payment->id ?>" class="btn-file-label"><i class="fa fa-paperclip"></i> <?= lang('choose_file') ?></label>
+                                                            <span class="file-name"></span>
+                                                        </span>
+                                                        <button type="submit" class="btn btn-upload-pdf"><i class="fa fa-upload"></i> <?= lang('upload_pdf') ?></button>
+                                                        <?php if (!empty($payment->uploaded_pdf)): ?>
+                                                        <a href="#" class="btn btn-download-pdf download-pdf"
+                                                            data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/tax') ?>">
+                                                            <i class="fa fa-file-pdf-o"></i> <?= lang('pdf') ?>
+                                                        </a>
+                                                        <?php endif; ?>
+                                                    </form>
+                                                </div>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -599,10 +732,24 @@ $(document).ready(function() {
                                                     data-status="<?= $payment->status ?>">
                                                     <i class="fa fa-edit"></i> <?= lang('edit') ?>
                                                 </a>
-                                                <a href="#" class="btn btn-xs btn-danger download-pdf"
-                                                    data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/inps') ?>">
-                                                    <i class="fa fa-file-pdf-o"></i> PDF
-                                                </a>
+                                                <?php if (!empty($can_download_payment_pdf)): ?>
+                                                <div class="payment-pdf-actions">
+                                                    <form class="upload-payment-pdf-form" data-payment-id="<?= $payment->id ?>" data-payment-type="inps">
+                                                        <span class="file-input-wrap">
+                                                            <input type="file" name="payment_pdf" accept=".pdf" class="input-file-pdf" id="pdf-file-inps-<?= $payment->id ?>">
+                                                            <label for="pdf-file-inps-<?= $payment->id ?>" class="btn-file-label"><i class="fa fa-paperclip"></i> <?= lang('choose_file') ?></label>
+                                                            <span class="file-name"></span>
+                                                        </span>
+                                                        <button type="submit" class="btn btn-upload-pdf"><i class="fa fa-upload"></i> <?= lang('upload_pdf') ?></button>
+                                                        <?php if (!empty($payment->uploaded_pdf)): ?>
+                                                        <a href="#" class="btn btn-download-pdf download-pdf"
+                                                            data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/inps') ?>">
+                                                            <i class="fa fa-file-pdf-o"></i> <?= lang('pdf') ?>
+                                                        </a>
+                                                        <?php endif; ?>
+                                                    </form>
+                                                </div>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -745,10 +892,24 @@ $(document).ready(function() {
                                                     data-status="<?= $payment->status ?>">
                                                     <i class="fa fa-edit"></i> <?= lang('edit') ?>
                                                 </a>
-                                                <a href="#" class="btn btn-xs btn-danger download-pdf"
-                                                    data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/inail') ?>">
-                                                    <i class="fa fa-file-pdf-o"></i> PDF
-                                                </a>
+                                                <?php if (!empty($can_download_payment_pdf)): ?>
+                                                <div class="payment-pdf-actions">
+                                                    <form class="upload-payment-pdf-form" data-payment-id="<?= $payment->id ?>" data-payment-type="inail">
+                                                        <span class="file-input-wrap">
+                                                            <input type="file" name="payment_pdf" accept=".pdf" class="input-file-pdf" id="pdf-file-inail-<?= $payment->id ?>">
+                                                            <label for="pdf-file-inail-<?= $payment->id ?>" class="btn-file-label"><i class="fa fa-paperclip"></i> <?= lang('choose_file') ?></label>
+                                                            <span class="file-name"></span>
+                                                        </span>
+                                                        <button type="submit" class="btn btn-upload-pdf"><i class="fa fa-upload"></i> <?= lang('upload_pdf') ?></button>
+                                                        <?php if (!empty($payment->uploaded_pdf)): ?>
+                                                        <a href="#" class="btn btn-download-pdf download-pdf"
+                                                            data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/inail') ?>">
+                                                            <i class="fa fa-file-pdf-o"></i> <?= lang('pdf') ?>
+                                                        </a>
+                                                        <?php endif; ?>
+                                                    </form>
+                                                </div>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -822,10 +983,24 @@ $(document).ready(function() {
                                                     data-status="<?= $payment->status ?>">
                                                     <i class="fa fa-edit"></i> <?= lang('edit') ?>
                                                 </a>
-                                                <a href="#" class="btn btn-xs btn-danger download-pdf"
-                                                    data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/diritto_annuale') ?>">
-                                                    <i class="fa fa-file-pdf-o"></i> PDF
-                                                </a>
+                                                <?php if (!empty($can_download_payment_pdf)): ?>
+                                                <div class="payment-pdf-actions">
+                                                    <form class="upload-payment-pdf-form" data-payment-id="<?= $payment->id ?>" data-payment-type="diritto_annuale">
+                                                        <span class="file-input-wrap">
+                                                            <input type="file" name="payment_pdf" accept=".pdf" class="input-file-pdf" id="pdf-file-diritto-<?= $payment->id ?>">
+                                                            <label for="pdf-file-diritto-<?= $payment->id ?>" class="btn-file-label"><i class="fa fa-paperclip"></i> <?= lang('choose_file') ?></label>
+                                                            <span class="file-name"></span>
+                                                        </span>
+                                                        <button type="submit" class="btn btn-upload-pdf"><i class="fa fa-upload"></i> <?= lang('upload_pdf') ?></button>
+                                                        <?php if (!empty($payment->uploaded_pdf)): ?>
+                                                        <a href="#" class="btn btn-download-pdf download-pdf"
+                                                            data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/diritto_annuale') ?>">
+                                                            <i class="fa fa-file-pdf-o"></i> <?= lang('pdf') ?>
+                                                        </a>
+                                                        <?php endif; ?>
+                                                    </form>
+                                                </div>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -960,10 +1135,24 @@ $(document).ready(function() {
                                                     data-status="<?= $payment->status ?>">
                                                     <i class="fa fa-edit"></i> <?= lang('edit') ?>
                                                 </a>
-                                                <a href="#" class="btn btn-xs btn-danger download-pdf"
-                                                    data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/fattura_tra_privati') ?>">
-                                                    <i class="fa fa-file-pdf-o"></i> PDF
-                                                </a>
+                                                <?php if (!empty($can_download_payment_pdf)): ?>
+                                                <div class="payment-pdf-actions">
+                                                    <form class="upload-payment-pdf-form" data-payment-id="<?= $payment->id ?>" data-payment-type="fattura_tra_privati">
+                                                        <span class="file-input-wrap">
+                                                            <input type="file" name="payment_pdf" accept=".pdf" class="input-file-pdf" id="pdf-file-fattura-<?= $payment->id ?>">
+                                                            <label for="pdf-file-fattura-<?= $payment->id ?>" class="btn-file-label"><i class="fa fa-paperclip"></i> <?= lang('choose_file') ?></label>
+                                                            <span class="file-name"></span>
+                                                        </span>
+                                                        <button type="submit" class="btn btn-upload-pdf"><i class="fa fa-upload"></i> <?= lang('upload_pdf') ?></button>
+                                                        <?php if (!empty($payment->uploaded_pdf)): ?>
+                                                        <a href="#" class="btn btn-download-pdf download-pdf"
+                                                            data-url="<?= admin_url('tax_calculations/payment_pdf/' . $payment->id . '/fattura_tra_privati') ?>">
+                                                            <i class="fa fa-file-pdf-o"></i> <?= lang('pdf') ?>
+                                                        </a>
+                                                        <?php endif; ?>
+                                                    </form>
+                                                </div>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>

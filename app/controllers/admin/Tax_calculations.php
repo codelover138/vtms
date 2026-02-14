@@ -230,6 +230,8 @@ class Tax_calculations extends MY_Controller
         $this->data['fattura_tra_privati_calculation'] = $this->tax_calculations_model->getFatturaTraPrivatiCalculation($customer_id, $year);
         $this->data['fattura_tra_privati_payments'] = $this->tax_calculations_model->getAllFatturaTraPrivatiPayments($customer_id, $year);
 
+        $this->data['can_download_payment_pdf'] = $this->canViewTaxCalculation();
+
         $bc = [
             ['link' => base_url(), 'page' => lang('home')],
             ['link' => admin_url('tax_calculations'), 'page' => lang('tax_calculations')],
@@ -480,11 +482,39 @@ class Tax_calculations extends MY_Controller
     }
 
     /**
-     * Generate PDF for a payment
+     * Allow download only if user has view tax calculation permission or is Owner.
+     */
+    private function canViewTaxCalculation()
+    {
+        return $this->Owner || $this->Admin || !empty($this->data['GP']['tax_calculations-view']);
+    }
+
+    /**
+     * Get payment table name for type
+     */
+    private function getPaymentTable($payment_type)
+    {
+        $tables = array(
+            'tax' => 'tax_payments',
+            'inps' => 'inps_payments',
+            'inail' => 'inail_payments',
+            'diritto_annuale' => 'diritto_annuale_payments',
+            'fattura_tra_privati' => 'fattura_tra_privati_payments'
+        );
+        return isset($tables[$payment_type]) ? $tables[$payment_type] : 'tax_payments';
+    }
+
+    /**
+     * Download uploaded PDF for a payment. Only if user has view tax calculation permission or Owner.
+     * PDF must have been uploaded (no generated PDF).
      */
     public function payment_pdf($payment_id = null, $payment_type = 'tax')
     {
-        $this->sma->checkPermissions();
+        if (!$this->canViewTaxCalculation()) {
+            $this->session->set_flashdata('error', lang('access_denied'));
+            redirect(isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : admin_url('tax_calculations'));
+            return;
+        }
 
         $redirect_url = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : admin_url('tax_calculations');
 
@@ -494,19 +524,7 @@ class Tax_calculations extends MY_Controller
             return;
         }
 
-        // Determine table based on payment type
-        $table = 'tax_payments';
-        if ($payment_type == 'inps') {
-            $table = 'inps_payments';
-        } elseif ($payment_type == 'inail') {
-            $table = 'inail_payments';
-        } elseif ($payment_type == 'diritto_annuale') {
-            $table = 'diritto_annuale_payments';
-        } elseif ($payment_type == 'fattura_tra_privati') {
-            $table = 'fattura_tra_privati_payments';
-        }
-
-        // Get payment details
+        $table = $this->getPaymentTable($payment_type);
         $payment = $this->db->get_where($table, array('id' => $payment_id), 1)->row();
         if (!$payment) {
             $this->session->set_flashdata('error', lang('payment_not_found'));
@@ -514,51 +532,80 @@ class Tax_calculations extends MY_Controller
             return;
         }
 
-        // Get customer details
-        $customer = $this->site->getCompanyByID($payment->customer_id);
-        if (!$customer) {
-            $this->session->set_flashdata('error', lang('customer_not_found'));
+        if (empty($payment->uploaded_pdf)) {
+            $this->session->set_flashdata('error', lang('no_pdf_uploaded_for_this_payment'));
             redirect($redirect_url);
             return;
         }
 
-        // Get payment type name for display
-        $payment_type_name = ucfirst(str_replace('_', ' ', $payment_type));
-        if ($payment_type == 'tax' && isset($payment->payment_type)) {
-            $lang_name = lang($payment->payment_type);
-            $payment_type_name = $lang_name ? $lang_name : ucfirst(str_replace('_', ' ', $payment->payment_type));
-        } elseif ($payment_type == 'inps' && !empty($payment->notes)) {
-            $payment_type_name = $payment->notes;
-        }
-
-        // Get biller (service provider) information
-        $biller = null;
-        if (!empty($this->Settings->default_biller)) {
-            $biller = $this->site->getCompanyByID($this->Settings->default_biller);
-        }
-        // If no default biller, try to get first biller
-        if (!$biller) {
-            $this->db->where('group_name', 'biller');
-            $this->db->limit(1);
-            $biller = $this->db->get('companies')->row();
-        }
-
-        $this->data['payment'] = $payment;
-        $this->data['customer'] = $customer;
-        $this->data['biller'] = $biller;
-        $this->data['payment_type'] = $payment_type;
-        $this->data['payment_type_name'] = $payment_type_name;
-        $this->data['Settings'] = $this->Settings;
-
-        try {
-            $html = $this->load->view($this->theme . 'tax_calculations/payment_pdf', $this->data, true);
-            $name = $payment_type . '_payment_' . $payment_id . '.pdf';
-            $this->sma->generate_pdf($html, $name);
-        } catch (Exception $e) {
-            log_message('error', 'PDF Generation Error: ' . $e->getMessage());
-            $this->session->set_flashdata('error', 'PDF generation failed: ' . $e->getMessage());
+        $file_path = FCPATH . $payment->uploaded_pdf;
+        if (!is_file($file_path)) {
+            $this->session->set_flashdata('error', lang('file_not_found'));
             redirect($redirect_url);
+            return;
         }
+
+        $this->load->helper('download');
+        $name = basename($payment->uploaded_pdf);
+        force_download($name, file_get_contents($file_path));
+    }
+
+    /**
+     * Upload PDF for a payment (AJAX). Only if user has view tax calculation permission or Owner.
+     */
+    public function upload_payment_pdf()
+    {
+        if (!$this->canViewTaxCalculation()) {
+            $this->sma->send_json(array('error' => 1, 'msg' => lang('access_denied')));
+            return;
+        }
+
+        $payment_id = (int) $this->input->post('payment_id');
+        $payment_type = $this->input->post('payment_type') ?: 'tax';
+        if (!$payment_id || !in_array($payment_type, array('tax', 'inps', 'inail', 'diritto_annuale', 'fattura_tra_privati'))) {
+            $this->sma->send_json(array('error' => 1, 'msg' => lang('invalid_request')));
+            return;
+        }
+
+        $table = $this->getPaymentTable($payment_type);
+        $payment = $this->db->get_where($table, array('id' => $payment_id), 1)->row();
+        if (!$payment) {
+            $this->sma->send_json(array('error' => 1, 'msg' => lang('payment_not_found')));
+            return;
+        }
+
+        $upload_path = FCPATH . 'assets/uploads/tax_payment_pdfs/';
+        if (!is_dir($upload_path)) {
+            mkdir($upload_path, 0755, true);
+        }
+
+        $this->load->library('upload');
+        $config = array(
+            'upload_path'   => $upload_path,
+            'allowed_types' => 'pdf',
+            'max_size'      => 10240,
+            'overwrite'     => true,
+            'file_name'     => $payment_type . '_' . $payment_id . '_' . time() . '.pdf'
+        );
+        $this->upload->initialize($config);
+
+        if (!$this->upload->do_upload('payment_pdf')) {
+            $this->sma->send_json(array('error' => 1, 'msg' => $this->upload->display_errors('', '')));
+            return;
+        }
+
+        $data = $this->upload->data();
+        $relative_path = 'assets/uploads/tax_payment_pdfs/' . $data['file_name'];
+
+        // Remove old file if any
+        if (!empty($payment->uploaded_pdf) && is_file(FCPATH . $payment->uploaded_pdf)) {
+            @unlink(FCPATH . $payment->uploaded_pdf);
+        }
+
+        $this->db->where('id', $payment_id);
+        $this->db->update($table, array('uploaded_pdf' => $relative_path));
+
+        $this->sma->send_json(array('error' => 0, 'msg' => lang('pdf_uploaded_successfully'), 'path' => $relative_path));
     }
 
     /**

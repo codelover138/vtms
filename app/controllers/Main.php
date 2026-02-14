@@ -202,6 +202,12 @@ class Main extends MY_Shop_Controller
         if (!is_array($this->data['inail_payments'])) $this->data['inail_payments'] = array();
         if (!is_array($this->data['diritto_annuale_payments'])) $this->data['diritto_annuale_payments'] = array();
         if (!is_array($this->data['fattura_tra_privati_payments'])) $this->data['fattura_tra_privati_payments'] = array();
+
+        foreach ($this->data['tax_payments'] as $p) { $p->payment_type_slug = 'tax'; }
+        foreach ($this->data['inps_payments'] as $p) { $p->payment_type_slug = 'inps'; }
+        foreach ($this->data['inail_payments'] as $p) { $p->payment_type_slug = 'inail'; }
+        foreach ($this->data['diritto_annuale_payments'] as $p) { $p->payment_type_slug = 'diritto_annuale'; }
+        foreach ($this->data['fattura_tra_privati_payments'] as $p) { $p->payment_type_slug = 'fattura_tra_privati'; }
         
         foreach ($this->data['tax_payments'] as $payment) {
             if ($payment->status == 'paid') {
@@ -344,6 +350,206 @@ class Main extends MY_Shop_Controller
         $this->data['page_title'] = lang('dashboard');
         $this->data['page_desc'] = lang('user_dashboard');
         $this->page_construct('user/dashboard', $this->data);
+    }
+
+    /**
+     * Generate Annual Tax Report PDF for the logged-in customer (same as admin tax_calculations/view PDF).
+     * Customer ID is taken from the logged-in user's company_id; year from GET.
+     */
+    function annual_tax_report_pdf()
+    {
+        if (!$this->loggedIn) {
+            $this->session->set_userdata('requested_page', 'annual_tax_report_pdf');
+            redirect('login');
+            return;
+        }
+        if ($this->Staff) {
+            redirect('admin/welcome');
+            return;
+        }
+        if (!$this->Customer) {
+            redirect('/');
+            return;
+        }
+
+        $redirect_url = site_url('dashboard');
+        $user = $this->site->getUser();
+        $customer_id = $user->company_id;
+        $year = $this->input->get('year');
+
+        if (!$customer_id || !$year) {
+            $this->session->set_flashdata('error', lang('invalid_request'));
+            redirect($redirect_url);
+            return;
+        }
+
+        $this->load->admin_model('tax_calculations_model');
+        $user_language = isset($this->Settings->user_language) ? $this->Settings->user_language : (isset($this->Settings->language) ? $this->Settings->language : 'english');
+        $this->lang->admin_load('tax_calculations', $user_language);
+
+        $customer = $this->site->getCompanyByID($customer_id);
+        if (!$customer) {
+            $this->session->set_flashdata('error', lang('customer_not_found'));
+            redirect($redirect_url);
+            return;
+        }
+
+        $tax_calculation = $this->tax_calculations_model->getTaxCalculation($customer_id, $year);
+        if (!$tax_calculation) {
+            $this->session->set_flashdata('error', lang('no_tax_calculation_found_for_year') . ' ' . $year);
+            redirect($redirect_url);
+            return;
+        }
+
+        // Get actual first and last transaction dates from income_data
+        $this->db->select_min('date_transmission', 'first_date');
+        $this->db->select_max('date_transmission', 'last_date');
+        $this->db->where('customer_id', $customer_id);
+        $this->db->where('YEAR(date_transmission)', $year);
+        $period_query = $this->db->get('income_data');
+
+        $period_start = null;
+        $period_end = null;
+        if ($period_query->num_rows() > 0 && $period_query->row()->first_date) {
+            $first_date = new DateTime($period_query->row()->first_date);
+            $last_date = new DateTime($period_query->row()->last_date);
+            $period_start = $first_date->format('d/m/Y');
+            $period_end = $last_date->format('d/m/Y');
+        } else {
+            if ($customer->business_start_date) {
+                $start_date = new DateTime($customer->business_start_date);
+                if ($start_date->format('Y') == $year) {
+                    $period_start = $start_date->format('d/m/Y');
+                } else {
+                    $period_start = '01/01/' . $year;
+                }
+            } else {
+                $period_start = '01/01/' . $year;
+            }
+            $period_end = '31/12/' . $year;
+        }
+
+        $total_sales = $tax_calculation->total_sales;
+        $coefficient = $tax_calculation->coefficient_used;
+        $costs = $total_sales * (100 - $coefficient) / 100;
+        $net_income = $tax_calculation->taxable_income;
+
+        $ateco_code = '';
+        if (!empty($customer->cf1)) {
+            $ateco_code = $customer->cf1;
+        } elseif (!empty($customer->cf2)) {
+            $ateco_code = $customer->cf2;
+        }
+
+        $pec_email = !empty($customer->cf3) ? $customer->cf3 : '';
+        $tax_number = !empty($customer->vat_no) ? trim($customer->vat_no) : '';
+        $vat_number = !empty($customer->cf4) ? trim($customer->cf4) : '';
+
+        $activity_description = '';
+        if (!empty($customer->cf5)) {
+            $activity_description = $customer->cf5;
+        } elseif (!empty($customer->cf6)) {
+            $activity_description = $customer->cf6;
+        }
+        if (empty($activity_description) && !empty($customer->customer_type)) {
+            $activity_map = array(
+                'Gestione Separata' => 'prestazioni di servizi',
+                'Commercianti' => 'commercio',
+                'Artigiani' => 'artigianato'
+            );
+            $activity_description = isset($activity_map[$customer->customer_type]) ? $activity_map[$customer->customer_type] : strtolower($customer->customer_type);
+        }
+
+        $this->data['customer'] = $customer;
+        $this->data['tax_calculation'] = $tax_calculation;
+        $this->data['year'] = $year;
+        $this->data['period_start'] = $period_start;
+        $this->data['period_end'] = $period_end;
+        $this->data['total_sales'] = $total_sales;
+        $this->data['coefficient'] = $coefficient;
+        $this->data['costs'] = $costs;
+        $this->data['net_income'] = $net_income;
+        $this->data['ateco_code'] = $ateco_code;
+        $this->data['pec_email'] = $pec_email;
+        $this->data['tax_number'] = $tax_number;
+        $this->data['vat_number'] = $vat_number;
+        $this->data['activity_description'] = $activity_description;
+        $this->data['tax_regime'] = $customer->tax_regime ? $customer->tax_regime : 'regime_forfettario';
+        $this->data['Settings'] = $this->Settings;
+        $this->data['user_language'] = $user_language;
+
+        $biller = null;
+        if (!empty($this->Settings->default_biller)) {
+            $biller = $this->site->getCompanyByID($this->Settings->default_biller);
+        }
+        if (!$biller) {
+            $this->db->where('group_name', 'biller');
+            $this->db->limit(1);
+            $biller = $this->db->get('companies')->row();
+        }
+        $this->data['biller'] = $biller;
+
+        try {
+            $admin_theme = $this->Settings->theme . '/admin/views/';
+            $html = $this->load->view($admin_theme . 'tax_calculations/annual_tax_report_pdf', $this->data, true);
+            $name = 'Conto_Economico_' . $customer->name . '_' . $year . '.pdf';
+            $name = str_replace(' ', '_', $name);
+            $this->sma->generate_pdf($html, $name);
+        } catch (Exception $e) {
+            log_message('error', 'PDF Generation Error: ' . $e->getMessage());
+            $this->session->set_flashdata('error', 'PDF generation failed: ' . $e->getMessage());
+            redirect($redirect_url);
+        }
+    }
+
+    /**
+     * Download uploaded payment PDF for the logged-in customer (own payments only).
+     */
+    function download_payment_pdf($payment_id = null, $payment_type = 'tax')
+    {
+        if (!$this->loggedIn || $this->Staff || !$this->Customer) {
+            redirect('/');
+            return;
+        }
+        $user = $this->site->getUser();
+        $customer_id = $user->company_id;
+        if (!$customer_id) {
+            redirect(site_url('dashboard'));
+            return;
+        }
+
+        $payment_id = (int) $payment_id;
+        $allowed_types = array('tax', 'inps', 'inail', 'diritto_annuale', 'fattura_tra_privati');
+        if (!$payment_id || !in_array($payment_type, $allowed_types)) {
+            $this->session->set_flashdata('error', lang('invalid_request'));
+            redirect(site_url('dashboard'));
+            return;
+        }
+
+        $tables = array(
+            'tax' => 'tax_payments',
+            'inps' => 'inps_payments',
+            'inail' => 'inail_payments',
+            'diritto_annuale' => 'diritto_annuale_payments',
+            'fattura_tra_privati' => 'fattura_tra_privati_payments'
+        );
+        $table = $tables[$payment_type];
+        $payment = $this->db->get_where($table, array('id' => $payment_id, 'customer_id' => $customer_id), 1)->row();
+        if (!$payment || empty($payment->uploaded_pdf)) {
+            $this->session->set_flashdata('error', lang('file_not_found'));
+            redirect(site_url('dashboard'));
+            return;
+        }
+
+        $file_path = FCPATH . $payment->uploaded_pdf;
+        if (!is_file($file_path)) {
+            $this->session->set_flashdata('error', lang('file_not_found'));
+            redirect(site_url('dashboard'));
+            return;
+        }
+
+        $this->load->helper('download');
+        force_download(basename($payment->uploaded_pdf), file_get_contents($file_path));
     }
 
     function profile($act = NULL) {
