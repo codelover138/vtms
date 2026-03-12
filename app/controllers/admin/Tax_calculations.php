@@ -413,6 +413,44 @@ class Tax_calculations extends MY_Controller
     }
 
     /**
+     * Download an Excel-compatible template for historical year data entry.
+     */
+    public function historical_year_template()
+    {
+        $this->sma->checkPermissions('view');
+
+        $customer_id = (int) $this->input->get('customer_id');
+        if (!$customer_id) {
+            $this->session->set_flashdata('error', lang('customer_not_found'));
+            admin_redirect('tax_calculations');
+            return;
+        }
+
+        $customer = $this->site->getCompanyByID($customer_id);
+        if (!$customer) {
+            $this->session->set_flashdata('error', lang('customer_not_found'));
+            admin_redirect('tax_calculations');
+            return;
+        }
+
+        if (!$this->tax_calculations_model->validateCustomerHasTaxSettings($customer_id)) {
+            $this->session->set_flashdata('error', lang('historical_year_settings_required'));
+            admin_redirect('tax_calculations/settings?customer_id=' . $customer_id);
+            return;
+        }
+
+        $rows = $this->buildHistoricalYearTemplateRows($customer);
+        $customer_name = trim($customer->name . ' ' . $customer->last_name);
+        $filename = 'historical_year_template_customer_' . $customer_id . '.xls';
+        $xml = $this->buildHistoricalYearSpreadsheetXml($customer, $customer_name, $rows);
+
+        $this->output
+            ->set_content_type('application/vnd.ms-excel; charset=UTF-8')
+            ->set_header('Content-Disposition: attachment; filename="' . $filename . '"')
+            ->set_output($xml);
+    }
+
+    /**
      * Save historical year data (POST).
      */
     public function save_historical_year()
@@ -1022,5 +1060,156 @@ class Tax_calculations extends MY_Controller
             $this->session->set_flashdata('error', lang('inps_slab_delete_failed'));
         }
         admin_redirect('tax_calculations/inps_slabs');
+    }
+
+    private function buildHistoricalYearTemplateRows($customer)
+    {
+        $customer_type = !empty($customer->customer_type) ? $customer->customer_type : '';
+        $gestione_separata = ($customer_type === 'Gestione Separata');
+        $is_artigiani = ($customer_type === 'Artigiani');
+        $is_commercianti_artigiani = in_array($customer_type, array('Artigiani', 'Commercianti'));
+        $current_year = (int) date('Y');
+
+        $rows = array(
+            array('year', 'General', lang('year'), 'number', 'Yes', '', (string) $current_year, 'Allowed range in the form: ' . $current_year . ' to ' . ($current_year - 15)),
+            array('coefficient_used', 'General', lang('coefficient_used'), 'number', 'No', '', !empty($customer->coefficient_of_profitability) ? (string) $customer->coefficient_of_profitability : '78', ''),
+            array('tax_rate_used', 'General', lang('tax_rate_used'), 'number', 'No', '', !empty($customer->tax_rate) ? (string) $customer->tax_rate : '5', ''),
+
+            array('total_sales', 'Tax Calculation', lang('total_sales'), 'number', 'No', '', '0', ''),
+            array('taxable_income', 'Tax Calculation', lang('taxable_income'), 'number', 'No', '', '0', ''),
+            array('tax_due', 'Tax Calculation', lang('tax_due'), 'number', 'No', '', '0', ''),
+            array('advance_payments_made', 'Tax Calculation', lang('advance_payments_made'), 'number', 'No', '', '0', ''),
+            array('balance_payment', 'Tax Calculation', lang('balance_payment'), 'number', 'No', '', '0', ''),
+            array('next_year_advance_base', 'Tax Calculation', lang('next_year_advance_base'), 'number', 'No', '', '0', ''),
+            array('previous_year_inps', 'Tax Calculation', lang('previous_year_inps'), 'number', 'No', '', '0', ''),
+
+            array('tax_balance_amount', 'Tax Payments', lang('balance') . ' ' . lang('amount'), 'number', 'No', '', '0', ''),
+            array('tax_balance_paid_amount', 'Tax Payments', lang('balance') . ' ' . lang('paid_amount'), 'number', 'No', '', '0', ''),
+            array('tax_balance_paid_date', 'Tax Payments', lang('balance') . ' ' . lang('paid_date'), 'date', 'No', '', '', 'Format: YYYY-MM-DD'),
+            array('tax_balance_status', 'Tax Payments', lang('balance') . ' ' . lang('status'), 'select', 'No', 'pending,paid,overdue', 'pending', ''),
+            array('tax_first_advance_amount', 'Tax Payments', lang('first_advance') . ' ' . lang('amount'), 'number', 'No', '', '0', ''),
+            array('tax_first_advance_paid_amount', 'Tax Payments', lang('first_advance') . ' ' . lang('paid_amount'), 'number', 'No', '', '0', ''),
+            array('tax_first_advance_paid_date', 'Tax Payments', lang('first_advance') . ' ' . lang('paid_date'), 'date', 'No', '', '', 'Format: YYYY-MM-DD'),
+            array('tax_first_advance_status', 'Tax Payments', lang('first_advance') . ' ' . lang('status'), 'select', 'No', 'pending,paid,overdue', 'pending', ''),
+            array('tax_second_advance_amount', 'Tax Payments', lang('second_advance') . ' ' . lang('amount'), 'number', 'No', '', '0', ''),
+            array('tax_second_advance_paid_amount', 'Tax Payments', lang('second_advance') . ' ' . lang('paid_amount'), 'number', 'No', '', '0', ''),
+            array('tax_second_advance_paid_date', 'Tax Payments', lang('second_advance') . ' ' . lang('paid_date'), 'date', 'No', '', '', 'Format: YYYY-MM-DD'),
+            array('tax_second_advance_status', 'Tax Payments', lang('second_advance') . ' ' . lang('status'), 'select', 'No', 'pending,paid,overdue', 'pending', ''),
+
+            array('inps_taxable_income', 'INPS', lang('inps_taxable_income'), 'number', 'No', '', '0', ''),
+            array('inps_amount', 'INPS', lang('inps_amount'), 'number', 'No', '', '0', ''),
+            array('inps_discount_percentage', 'INPS', lang('discount_percentage'), 'number', 'No', '', '0', ''),
+            array('inps_discount_amount', 'INPS', lang('discount_amount'), 'number', 'No', '', '0', ''),
+            array('inps_amount_after_discount', 'INPS', lang('inps_amount_after_discount'), 'number', 'No', '', '0', ''),
+        );
+
+        $installment_count = $gestione_separata ? 3 : 4;
+        for ($n = 1; $n <= $installment_count; $n++) {
+            $rows[] = array('inps_installment_' . $n . '_amount', 'INPS Payments', 'Installment ' . $n . ' ' . lang('amount'), 'number', 'No', '', '0', '');
+            $rows[] = array('inps_installment_' . $n . '_paid_amount', 'INPS Payments', 'Installment ' . $n . ' ' . lang('paid_amount'), 'number', 'No', '', '0', '');
+            $rows[] = array('inps_installment_' . $n . '_paid_date', 'INPS Payments', 'Installment ' . $n . ' ' . lang('paid_date'), 'date', 'No', '', '', 'Format: YYYY-MM-DD');
+            $rows[] = array('inps_installment_' . $n . '_status', 'INPS Payments', 'Installment ' . $n . ' ' . lang('status'), 'select', 'No', 'PENDING,PAID,OVERDUE', 'PENDING', '');
+        }
+
+        if ($is_artigiani) {
+            $rows[] = array('inail_taxable_income', 'INAIL', lang('inail_taxable_income'), 'number', 'No', '', '0', '');
+            $rows[] = array('inail_final_amount', 'INAIL', lang('inail_final_amount'), 'number', 'No', '', '0', '');
+            $rows[] = array('inail_payment_amount', 'INAIL', lang('inail_payment') . ' ' . lang('amount'), 'number', 'No', '', '0', '');
+            $rows[] = array('inail_payment_paid_amount', 'INAIL', lang('inail_payment') . ' ' . lang('paid_amount'), 'number', 'No', '', '0', '');
+            $rows[] = array('inail_payment_paid_date', 'INAIL', lang('inail_payment') . ' ' . lang('paid_date'), 'date', 'No', '', '', 'Format: YYYY-MM-DD');
+            $rows[] = array('inail_payment_status', 'INAIL', lang('inail_payment') . ' ' . lang('status'), 'select', 'No', 'pending,paid,overdue', 'pending', '');
+        }
+
+        if ($is_commercianti_artigiani) {
+            $rows[] = array('diritto_annuale_amount', 'Diritto Annuale', lang('amount'), 'number', 'No', '', !empty($customer->diritto_annuale_amount) ? (string) $customer->diritto_annuale_amount : '0', '');
+            $rows[] = array('diritto_annuale_paid_amount', 'Diritto Annuale', lang('paid_amount'), 'number', 'No', '', '0', '');
+            $rows[] = array('diritto_annuale_paid_date', 'Diritto Annuale', lang('paid_date'), 'date', 'No', '', '', 'Format: YYYY-MM-DD');
+            $rows[] = array('diritto_annuale_status', 'Diritto Annuale', lang('status'), 'select', 'No', 'pending,paid,overdue', 'pending', '');
+        }
+
+        $rows[] = array('fattura_total_invoices', 'Fattura Tra Privati', lang('total_invoices'), 'number', 'No', '', '0', 'Optional section');
+        $rows[] = array('fattura_total_sales_amount', 'Fattura Tra Privati', lang('total_sales_amount'), 'number', 'No', '', '0', 'Optional section');
+        $rows[] = array('fattura_total_payment_amount', 'Fattura Tra Privati', lang('total_payment_amount'), 'number', 'No', '', '0', 'Optional section');
+        $rows[] = array('fattura_paid_amount', 'Fattura Tra Privati', lang('paid_amount'), 'number', 'No', '', '0', 'Optional section');
+        $rows[] = array('fattura_paid_date', 'Fattura Tra Privati', lang('paid_date'), 'date', 'No', '', '', 'Format: YYYY-MM-DD');
+        $rows[] = array('fattura_status', 'Fattura Tra Privati', lang('status'), 'select', 'No', 'pending,paid,overdue', 'pending', 'Optional section');
+
+        return $rows;
+    }
+
+    private function buildHistoricalYearSpreadsheetXml($customer, $customer_name, $rows)
+    {
+        $customer_type = !empty($customer->customer_type) ? $customer->customer_type : '-';
+        $company = !empty($customer->company) ? $customer->company : '-';
+
+        $instructions = array(
+            array('Template', 'Historical year data import prep'),
+            array('Customer ID', $customer->id),
+            array('Customer Name', $customer_name !== '' ? $customer_name : '-'),
+            array('Company', $company),
+            array('Customer Type', $customer_type),
+            array('How to use', 'Fill the Value column in the second sheet, then copy the values into the historical year form.'),
+            array('Date format', 'YYYY-MM-DD'),
+            array('Status values', 'Use only the values listed in Allowed Values.'),
+        );
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>';
+        $xml .= '<?mso-application progid="Excel.Sheet"?>';
+        $xml .= '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"';
+        $xml .= ' xmlns:o="urn:schemas-microsoft-com:office:office"';
+        $xml .= ' xmlns:x="urn:schemas-microsoft-com:office:excel"';
+        $xml .= ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"';
+        $xml .= ' xmlns:html="http://www.w3.org/TR/REC-html40">';
+        $xml .= '<Styles>';
+        $xml .= '<Style ss:ID="Header"><Font ss:Bold="1"/><Interior ss:Color="#D9EAF7" ss:Pattern="Solid"/></Style>';
+        $xml .= '<Style ss:ID="Section"><Font ss:Bold="1"/><Interior ss:Color="#F2F2F2" ss:Pattern="Solid"/></Style>';
+        $xml .= '</Styles>';
+
+        $xml .= '<Worksheet ss:Name="Instructions"><Table>';
+        foreach ($instructions as $instruction) {
+            $xml .= '<Row>';
+            $xml .= '<Cell ss:StyleID="Header"><Data ss:Type="String">' . $this->xmlCell($instruction[0]) . '</Data></Cell>';
+            $xml .= '<Cell><Data ss:Type="String">' . $this->xmlCell($instruction[1]) . '</Data></Cell>';
+            $xml .= '</Row>';
+        }
+        $xml .= '</Table></Worksheet>';
+
+        $xml .= '<Worksheet ss:Name="Historical Year Data"><Table>';
+        $headers = array('Field Key', 'Section', 'Label', 'Input Type', 'Required', 'Allowed Values', 'Default Value', 'Value', 'Notes');
+        $xml .= '<Row>';
+        foreach ($headers as $header) {
+            $xml .= '<Cell ss:StyleID="Header"><Data ss:Type="String">' . $this->xmlCell($header) . '</Data></Cell>';
+        }
+        $xml .= '</Row>';
+
+        $current_section = '';
+        foreach ($rows as $row) {
+            if ($row[1] !== $current_section) {
+                $current_section = $row[1];
+                $xml .= '<Row>';
+                $xml .= '<Cell ss:StyleID="Section"><Data ss:Type="String">' . $this->xmlCell($current_section) . '</Data></Cell>';
+                for ($i = 0; $i < 8; $i++) {
+                    $xml .= '<Cell ss:StyleID="Section"><Data ss:Type="String"></Data></Cell>';
+                }
+                $xml .= '</Row>';
+            }
+
+            $xml .= '<Row>';
+            for ($i = 0; $i < 7; $i++) {
+                $xml .= '<Cell><Data ss:Type="String">' . $this->xmlCell($row[$i]) . '</Data></Cell>';
+            }
+            $xml .= '<Cell><Data ss:Type="String"></Data></Cell>';
+            $xml .= '<Cell><Data ss:Type="String">' . $this->xmlCell($row[7]) . '</Data></Cell>';
+            $xml .= '</Row>';
+        }
+        $xml .= '</Table></Worksheet>';
+        $xml .= '</Workbook>';
+
+        return $xml;
+    }
+
+    private function xmlCell($value)
+    {
+        return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
     }
 }

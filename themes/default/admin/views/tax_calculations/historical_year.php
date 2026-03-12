@@ -380,6 +380,10 @@ echo admin_form_open('tax_calculations/save_historical_year', $attrib); ?>
                 class="btn btn-default">
                 <i class="fa fa-arrow-left"></i> <?= lang('back') ?>
             </a>
+            <a href="<?= admin_url('tax_calculations/historical_year_template?customer_id=' . $customer->id) ?>"
+                class="btn btn-success">
+                <i class="fa fa-file-excel-o"></i> <?= lang('download_historical_year_template') ?>
+            </a>
             <button type="submit" class="btn btn-primary">
                 <i class="fa fa-save"></i> <?= lang('save_historical_year') ?>
             </button>

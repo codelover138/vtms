@@ -277,6 +277,7 @@ $lang['save_historical_year']                              = "Save Historical Ye
 $lang['historical_year_saved']                             = "Historical year data saved successfully.";
 $lang['historical_year_save_failed']                       = "Failed to save historical year data.";
 $lang['historical_year_settings_required']                 = "Please configure tax settings for this customer (customer type, coefficient, tax rate) before adding historical years.";
+$lang['download_historical_year_template']                 = "Download XLS Template";
 $lang['installments']                                     = "Installments";
 $lang['inail_payment']                                     = "INAIL Payment";
 $lang['total_sales_amount']                                = "Total Sales Amount";

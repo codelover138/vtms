@@ -279,6 +279,7 @@ $lang['save_historical_year']                              = "Salva Anno Storico
 $lang['historical_year_saved']                             = "Dati anno storico salvati con successo.";
 $lang['historical_year_save_failed']                       = "Impossibile salvare i dati dell'anno storico.";
 $lang['historical_year_settings_required']                 = "Configura le impostazioni fiscali per questo cliente (tipo cliente, coefficiente, aliquota) prima di aggiungere anni storici.";
+$lang['download_historical_year_template']                 = "Scarica template XLS";
 $lang['installments']                                     = "Rate";
 $lang['inail_payment']                                     = "Pagamento INAIL";
 $lang['total_sales_amount']                                = "Importo Vendite Totali";
